@@ -8,12 +8,13 @@ import {
 import {
   protect,
   isHR,
+  isEmployee,
 } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
 // Employee Dashboard
-router.get("/employee", protect, employeeDashboard);
+router.get("/employee", protect, isEmployee, employeeDashboard);
 
 // HR Dashboard
 router.get("/hr", protect, isHR, hrDashboard);

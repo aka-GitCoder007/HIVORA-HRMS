@@ -5,7 +5,7 @@ import Attendance from "../models/Attendance.js";
 // ==============================
 export const checkIn = async (req, res) => {
   try {
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Date().toLocaleDateString('en-CA');
 
     const existing = await Attendance.findOne({
       employee: req.user._id,
@@ -46,7 +46,7 @@ export const checkIn = async (req, res) => {
 // ==============================
 export const checkOut = async (req, res) => {
   try {
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Date().toLocaleDateString('en-CA');
 
     const attendance = await Attendance.findOne({
       employee: req.user._id,

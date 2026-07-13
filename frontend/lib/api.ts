@@ -11,7 +11,7 @@ export const apiClient = axios.create({
 
 apiClient.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
-    const token = window.localStorage.getItem('ems_token')
+    const token = window.localStorage.getItem('token') || window.sessionStorage.getItem('token') || window.localStorage.getItem('ems_token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -20,10 +20,32 @@ apiClient.interceptors.request.use((config) => {
   return config
 })
 
-export function normalizeRole(role?: string): 'employee' | 'admin' {
-  if (!role) return 'employee'
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 && typeof window !== 'undefined') {
+      window.localStorage.removeItem('token')
+      window.localStorage.removeItem('user')
+      window.localStorage.removeItem('rememberMe')
+      window.localStorage.removeItem('ems_token')
+      window.localStorage.removeItem('ems_user')
+      
+      window.sessionStorage.removeItem('token')
+      window.sessionStorage.removeItem('user')
+      window.sessionStorage.removeItem('rememberMe')
 
-  const normalized = role.toLowerCase()
+      if (window.location.pathname !== '/' && window.location.pathname !== '/login') {
+        window.location.href = '/?expired=true'
+      }
+    }
+    return Promise.reject(error)
+  }
+)
+
+export function normalizeRole(role?: string): 'employee' | 'admin' {
+  if (!role || typeof role !== 'string') return 'employee'
+
+  const normalized = role.trim().toLowerCase()
   if (normalized === 'hr' || normalized === 'admin' || normalized === 'administrator') {
     return 'admin'
   }
@@ -56,6 +78,12 @@ export function normalizeUser(user: any) {
     address: user?.address || '',
     salary: user?.salary ?? 0,
     profilePicture: user?.profilePicture || '',
+    dob: user?.dob || '',
+    gender: user?.gender || '',
+    emergencyContact: user?.emergencyContact || '',
+    emergencyPhone: user?.emergencyPhone || '',
+    joiningDate: user?.joiningDate || '',
+    reportingManager: user?.reportingManager || '',
   }
 }
 
@@ -159,10 +187,10 @@ export function normalizePayrollSummary(user: any): PayrollSummary & { id: strin
     id: user?._id || user?.id || '',
     employeeId: user?.employeeId || user?.id || '',
     employeeName: user?.name || '',
-    basicPay: salaryValue,
-    hra: 0,
-    allowances: 0,
-    deductions: 0,
+    basicPay: Number(user?.basicPay ?? salaryValue ?? 0),
+    hra: Number(user?.hra ?? 0),
+    allowances: Number(user?.allowances ?? 0),
+    deductions: Number(user?.deductions ?? 0),
     netPay: salaryValue,
     department: user?.department || '',
     designation: user?.designation || '',
@@ -174,7 +202,7 @@ export async function getCurrentUser() {
   return data
 }
 
-export async function loginUser(payload: { email: string; password: string }) {
+export async function loginUser(payload: { email: string; password: string; portal: 'employee' | 'admin' }) {
   const { data } = await apiClient.post('/auth/login', payload)
   return data
 }
@@ -201,6 +229,22 @@ export async function fetchProfile() {
 
 export async function updateProfile(payload: { address?: string; phone?: string; profilePicture?: string }) {
   const { data } = await apiClient.put('/profile', payload)
+  return data
+}
+
+export async function uploadImage(file: File) {
+  const formData = new FormData()
+  formData.append('image', file)
+  const { data } = await apiClient.post('/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })
+  return data
+}
+
+export async function updateEmployeeProfileByHR(id: string, payload: any) {
+  const { data } = await apiClient.put(`/profile/${id}`, payload)
   return data
 }
 
@@ -239,7 +283,7 @@ export async function applyLeave(payload: { leaveType: 'Paid' | 'Sick' | 'Unpaid
   return data
 }
 
-export async function updateLeaveStatus(id: string, payload: { status: 'Approved' | 'Rejected'; hrComment?: string }) {
+export async function updateLeaveStatus(id: string, payload: { status: 'Pending' | 'Approved' | 'Rejected'; hrComment?: string }) {
   const { data } = await apiClient.put(`/leave/${id}`, payload)
   return data
 }
@@ -254,7 +298,7 @@ export async function fetchAllPayroll() {
   return (data.employees || []).map(normalizePayrollSummary)
 }
 
-export async function updatePayroll(id: string, payload: { salary?: number; department?: string; designation?: string }) {
+export async function updatePayroll(id: string, payload: { salary?: number; basicPay?: number; hra?: number; allowances?: number; deductions?: number; department?: string; designation?: string }) {
   const { data } = await apiClient.put(`/payroll/${id}`, payload)
   return data
 }
@@ -266,5 +310,41 @@ export async function fetchDashboard() {
 
 export async function fetchHrDashboard() {
   const { data } = await apiClient.get('/dashboard/hr')
+  return data
+}
+
+export interface EmployeeProfile {
+  _id: string
+  employeeId: string
+  name: string
+  email: string
+  role: string
+  department: string
+  designation: string
+  phone: string
+  address: string
+  salary: number
+  profilePicture: string
+  dob: string
+  gender: string
+  emergencyContact: string
+  emergencyPhone: string
+  joiningDate: string
+  reportingManager: string
+  basicPay: number
+  hra: number
+  allowances: number
+  deductions: number
+  isVerified: boolean
+  createdAt: string
+}
+
+export async function fetchAllEmployees(): Promise<EmployeeProfile[]> {
+  const { data } = await apiClient.get('/profile/all')
+  return data.employees || []
+}
+
+export async function deleteEmployee(id: string) {
+  const { data } = await apiClient.delete(`/profile/${id}`)
   return data
 }

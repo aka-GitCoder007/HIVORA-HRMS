@@ -22,8 +22,9 @@ interface AuthContextType {
   user: User | null
   isAuthenticated: boolean
   isLoading: boolean
-  login: (userData: User | null, token?: string) => Promise<boolean>
+  login: (userData: User | null, token?: string, rememberMe?: boolean) => Promise<boolean>
   logout: () => void
+  restoreSession: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -32,43 +33,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
-    const loadSession = async () => {
-      if (typeof window === 'undefined') return
+  const restoreSession = async () => {
+    if (typeof window === 'undefined') return
 
-      const token = window.localStorage.getItem('ems_token')
-      const storedUser = window.localStorage.getItem('ems_user')
+    const token = window.localStorage.getItem('token') || window.sessionStorage.getItem('token')
+    // Legacy support for ems_token just in case
+    const legacyToken = window.localStorage.getItem('ems_token')
+    const actualToken = token || legacyToken
+    
+    const rememberMe = window.localStorage.getItem('rememberMe') === 'true'
 
-      if (!token) {
-        setIsLoading(false)
-        return
-      }
-
-      try {
-        const response = await getCurrentUser()
-        const normalizedUser = normalizeUser(response.user)
-        setUser(normalizedUser)
-        window.localStorage.setItem('ems_user', JSON.stringify(normalizedUser))
-      } catch (error) {
-        window.localStorage.removeItem('ems_token')
-        window.localStorage.removeItem('ems_user')
-        setUser(null)
-      } finally {
-        setIsLoading(false)
-      }
+    if (!actualToken) {
+      setUser(null)
+      setIsLoading(false)
+      return
     }
 
-    void loadSession()
+    try {
+      const response = await getCurrentUser()
+      const normalizedUser = normalizeUser(response?.user)
+      setUser(normalizedUser)
+      const storage = rememberMe ? window.localStorage : window.sessionStorage
+      storage.setItem('user', JSON.stringify(normalizedUser))
+    } catch (error) {
+      logout()
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void restoreSession()
   }, [])
 
-  const login = async (userData: User | null, token?: string): Promise<boolean> => {
+  const login = async (userData: User | null, token?: string, rememberMe: boolean = false): Promise<boolean> => {
     if (userData) {
       const normalizedUser = normalizeUser(userData)
       setUser(normalizedUser)
+      const storage = rememberMe ? window.localStorage : window.sessionStorage
+      
       if (token) {
-        window.localStorage.setItem('ems_token', token)
+        storage.setItem('token', token)
       }
-      window.localStorage.setItem('ems_user', JSON.stringify(normalizedUser))
+      storage.setItem('user', JSON.stringify(normalizedUser))
+      storage.setItem('rememberMe', String(rememberMe))
       return true
     }
 
@@ -77,12 +85,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     setUser(null)
-    window.localStorage.removeItem('ems_token')
-    window.localStorage.removeItem('ems_user')
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem('token')
+      window.localStorage.removeItem('user')
+      window.localStorage.removeItem('rememberMe')
+      window.localStorage.removeItem('ems_token')
+      window.localStorage.removeItem('ems_user')
+      
+      window.sessionStorage.removeItem('token')
+      window.sessionStorage.removeItem('user')
+      window.sessionStorage.removeItem('rememberMe')
+    }
   }
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout, restoreSession }}>
       {!isLoading && children}
     </AuthContext.Provider>
   )

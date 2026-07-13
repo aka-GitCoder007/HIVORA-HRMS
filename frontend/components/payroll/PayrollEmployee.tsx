@@ -5,6 +5,10 @@ import { Button } from '@/components/ui/button'
 import { Download, DollarSign } from 'lucide-react'
 import { fetchMyPayroll } from '@/lib/api'
 import { useAuth } from '@/lib/authContext'
+import { toast } from 'sonner'
+import { Loader2, FileX } from 'lucide-react'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 interface PayrollEmployeeProps {
   employeeId?: string
@@ -15,14 +19,17 @@ export function PayrollEmployee({ employeeId = '' }: PayrollEmployeeProps) {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth())
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [payroll, setPayroll] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const loadPayroll = async () => {
       try {
         const data = await fetchMyPayroll()
         setPayroll(data)
-      } catch (error) {
-        console.error(error)
+      } catch (error: any) {
+        toast.error(error?.response?.data?.message || 'Failed to load payroll data')
+      } finally {
+        setIsLoading(false)
       }
     }
 
@@ -33,6 +40,62 @@ export function PayrollEmployee({ employeeId = '' }: PayrollEmployeeProps) {
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
   const displayPayslip = payroll
+
+  const handleDownloadPayslip = () => {
+    if (!displayPayslip) {
+      toast.error('No payslip data to download')
+      return
+    }
+    
+    try {
+      const doc = new jsPDF()
+      
+      doc.setFontSize(18)
+      doc.text('Employee Payslip', 14, 22)
+      
+      doc.setFontSize(11)
+      doc.setTextColor(100)
+      doc.text(`For: ${monthNames[selectedMonth]} ${selectedYear}`, 14, 30)
+      doc.text(`Employee: ${currentEmployee?.name} (${currentEmployee?.employeeId || employeeId})`, 14, 37)
+
+      const totalEarnings = (displayPayslip.basicPay || 0) + (displayPayslip.hra || 0) + (displayPayslip.allowances || 0)
+      const totalDeductions = (displayPayslip.deductions || 0)
+
+      const tableRows = [
+        ['Basic Pay', `Rs. ${(displayPayslip.basicPay || 0).toLocaleString()}`],
+        ['HRA', `Rs. ${(displayPayslip.hra || 0).toLocaleString()}`],
+        ['Allowances', `Rs. ${(displayPayslip.allowances || 0).toLocaleString()}`],
+        ['Total Earnings', `Rs. ${totalEarnings.toLocaleString()}`],
+        ['', ''], // Empty row for visual separation
+        ['Deductions', `Rs. ${totalDeductions.toLocaleString()}`],
+        ['', ''], // Empty row for visual separation
+        ['Net Pay (Take Home)', `Rs. ${(displayPayslip.netPay || 0).toLocaleString()}`],
+      ]
+
+      autoTable(doc, {
+        head: [['Description', 'Amount']],
+        body: tableRows,
+        startY: 45,
+        theme: 'striped',
+        styles: { fontSize: 10, cellPadding: 4 },
+        headStyles: { fillColor: [41, 128, 185], textColor: 255 }
+      })
+
+      doc.save(`payslip_${monthNames[selectedMonth]}_${selectedYear}.pdf`)
+      toast.success('Payslip downloaded successfully')
+    } catch (error) {
+      console.error('PDF generation error:', error)
+      toast.error('Failed to generate PDF')
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -69,8 +132,11 @@ export function PayrollEmployee({ employeeId = '' }: PayrollEmployeeProps) {
               onChange={(e) => setSelectedYear(Number(e.target.value))}
               className="w-full px-4 py-2 border border-input rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value={2023}>2023</option>
-              <option value={2024}>2024</option>
+              {Array.from({ length: new Date().getFullYear() - 2021 }, (_, i) => 2022 + i).map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -87,7 +153,7 @@ export function PayrollEmployee({ employeeId = '' }: PayrollEmployeeProps) {
                 {monthNames[selectedMonth]} {selectedYear}
               </p>
             </div>
-            <Button className="bg-cyan-600 hover:bg-blue-700 text-white">
+            <Button onClick={handleDownloadPayslip} className="bg-cyan-600 hover:bg-blue-700 text-white">
               <Download className="w-4 h-4 mr-2" />
               Download Payslip
             </Button>
@@ -141,11 +207,11 @@ export function PayrollEmployee({ employeeId = '' }: PayrollEmployeeProps) {
           <div className="space-y-3">
             <div className="flex justify-between py-2 border-b border-border/50">
               <span className="text-foreground/70">Tax & Other Deductions</span>
-              <span className="font-semibold">₹{(displayPayslip?.deductions || 0).toLocaleString()}</span>
+              <span className="font-semibold">₹{(Number(displayPayslip?.deductions ?? 0) || 0).toLocaleString()}</span>
             </div>
             <div className="flex justify-between py-3 border-t border-border text-red-600 font-semibold">
               <span>Total Deductions</span>
-              <span>₹{displayPayslip?.deductions.toLocaleString()}</span>
+              <span>₹{(Number(displayPayslip?.deductions ?? 0) || 0).toLocaleString()}</span>
             </div>
           </div>
         </div>
@@ -179,7 +245,10 @@ export function PayrollEmployee({ employeeId = '' }: PayrollEmployeeProps) {
               </div>
             </button>
           ) : (
-            <p className="text-foreground/60">No payroll data available.</p>
+            <div className="flex flex-col items-center justify-center py-8 text-foreground/50 border border-dashed border-border/50 rounded-lg">
+              <FileX className="h-10 w-10 text-foreground/30 mb-2" />
+              <p className="font-medium">No payroll data available</p>
+            </div>
           )}
         </div>
       </div>

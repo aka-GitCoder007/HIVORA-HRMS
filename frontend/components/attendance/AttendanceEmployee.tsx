@@ -6,6 +6,8 @@ import { Clock, Calendar } from 'lucide-react'
 import { StatusBadge } from '../StatusBadge'
 import { checkInAttendance, checkOutAttendance, fetchMyAttendance } from '@/lib/api'
 import { useAuth } from '@/lib/authContext'
+import { toast } from 'sonner'
+import { Loader2 } from 'lucide-react'
 
 interface AttendanceEmployeeProps {
   employeeId?: string
@@ -14,28 +16,42 @@ interface AttendanceEmployeeProps {
 export function AttendanceEmployee({ employeeId = '' }: AttendanceEmployeeProps) {
   const { user } = useAuth()
   const [isCheckedIn, setIsCheckedIn] = useState(false)
+  const [hasTodayRecord, setHasTodayRecord] = useState(false)
   const [view, setView] = useState<'daily' | 'weekly'>('daily')
   const [checkedInTime, setCheckedInTime] = useState<string | null>(null)
   const [checkedOutTime, setCheckedOutTime] = useState<string | null>(null)
   const [attendance, setAttendance] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
+  const [isLoadingData, setIsLoadingData] = useState(true)
 
   const currentEmployee = user
+
+  const processRecords = (records: any[]) => {
+    setAttendance(records)
+    const todayStr = new Date().toLocaleDateString('en-CA')
+    const todayRecord = records.find((r: any) => r.date === todayStr)
+    if (todayRecord) {
+      setCheckedInTime(todayRecord.checkInTime || null)
+      setCheckedOutTime(todayRecord.checkOutTime || null)
+      setIsCheckedIn(Boolean(todayRecord.checkInTime && !todayRecord.checkOutTime))
+      setHasTodayRecord(true)
+    } else {
+      setCheckedInTime(null)
+      setCheckedOutTime(null)
+      setIsCheckedIn(false)
+      setHasTodayRecord(false)
+    }
+  }
 
   useEffect(() => {
     const loadAttendance = async () => {
       try {
         const records = await fetchMyAttendance()
-        setAttendance(records)
-        const today = new Date().toISOString().split('T')[0]
-        const todayRecord = records.find((r: any) => r.date === today)
-        if (todayRecord) {
-          setCheckedInTime(todayRecord.checkInTime || null)
-          setCheckedOutTime(todayRecord.checkOutTime || null)
-          setIsCheckedIn(Boolean(todayRecord.checkInTime && !todayRecord.checkOutTime))
-        }
-      } catch (error) {
-        console.error(error)
+        processRecords(records)
+      } catch (error: any) {
+        toast.error(error?.response?.data?.message || 'Failed to load attendance records')
+      } finally {
+        setIsLoadingData(false)
       }
     }
 
@@ -46,14 +62,11 @@ export function AttendanceEmployee({ employeeId = '' }: AttendanceEmployeeProps)
     setLoading(true)
     try {
       await checkInAttendance()
-      const now = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
-      setIsCheckedIn(true)
-      setCheckedInTime(now)
-      setCheckedOutTime(null)
       const records = await fetchMyAttendance()
-      setAttendance(records)
-    } catch (error) {
-      console.error(error)
+      processRecords(records)
+      toast.success('Successfully checked in for today!')
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Unable to check in. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -63,19 +76,26 @@ export function AttendanceEmployee({ employeeId = '' }: AttendanceEmployeeProps)
     setLoading(true)
     try {
       await checkOutAttendance()
-      const now = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
-      setCheckedOutTime(now)
       const records = await fetchMyAttendance()
-      setAttendance(records)
-    } catch (error) {
-      console.error(error)
+      processRecords(records)
+      toast.success('Successfully checked out. Have a great evening!')
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Unable to check out. Please try again.')
     } finally {
       setLoading(false)
     }
   }
 
-  const today = new Date().toISOString().split('T')[0]
-  const todayRecord = attendance.find((r: any) => r.date === today)
+  const todayStr = new Date().toLocaleDateString('en-CA')
+  const todayRecord = attendance.find((r: any) => r.date === todayStr)
+
+  if (isLoadingData) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -105,23 +125,25 @@ export function AttendanceEmployee({ employeeId = '' }: AttendanceEmployeeProps)
           </div>
         </div>
 
-        <div className="flex gap-3">
-          <Button
-            onClick={handleCheckIn}
-            disabled={isCheckedIn || loading}
-            className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
-          >
-            <Clock className="w-4 h-4 mr-2" />
-            Check In
-          </Button>
-          <Button
-            onClick={handleCheckOut}
-            disabled={!isCheckedIn || loading}
-            variant="outline"
-          >
-            <Clock className="w-4 h-4 mr-2" />
-            Check Out
-          </Button>
+        <div className="flex flex-col gap-3">
+          <div className="flex gap-3">
+            <Button
+              onClick={handleCheckIn}
+              disabled={hasTodayRecord || loading}
+              className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
+            >
+              <Clock className="w-4 h-4 mr-2" />
+              Check In
+            </Button>
+            <Button
+              onClick={handleCheckOut}
+              disabled={!isCheckedIn || loading}
+              variant="outline"
+            >
+              <Clock className="w-4 h-4 mr-2" />
+              Check Out
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -200,16 +222,27 @@ export function AttendanceEmployee({ employeeId = '' }: AttendanceEmployeeProps)
               </tr>
             </thead>
             <tbody>
-              {attendance.slice(0, 7).map((record: any, idx: number) => (
-                <tr key={idx} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
-                  <td className="py-3 px-4 text-foreground">{record.date}</td>
-                  <td className="py-3 px-4 text-foreground">{record.checkInTime || '-'}</td>
-                  <td className="py-3 px-4 text-foreground">{record.checkOutTime || '-'}</td>
-                  <td className="py-3 px-4">
-                    <StatusBadge status={record.status} />
+              {attendance.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="py-8 text-center text-foreground/50">
+                    <div className="flex flex-col items-center justify-center space-y-2">
+                      <Calendar className="h-8 w-8 text-foreground/30" />
+                      <p>No attendance records found.</p>
+                    </div>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                attendance.slice(0, 7).map((record: any, idx: number) => (
+                  <tr key={idx} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
+                    <td className="py-3 px-4 text-foreground">{record.date}</td>
+                    <td className="py-3 px-4 text-foreground">{record.checkInTime || '-'}</td>
+                    <td className="py-3 px-4 text-foreground">{record.checkOutTime || '-'}</td>
+                    <td className="py-3 px-4">
+                      <StatusBadge status={record.status} />
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

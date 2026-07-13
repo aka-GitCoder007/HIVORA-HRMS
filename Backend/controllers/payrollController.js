@@ -4,7 +4,7 @@ import User from "../models/User.js";
 export const getMyPayroll = async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select(
-      "name employeeId department designation salary"
+      "name employeeId department designation salary basicPay hra allowances deductions"
     );
 
     return res.status(200).json({
@@ -25,7 +25,7 @@ export const getMyPayroll = async (req, res) => {
 export const getAllPayroll = async (req, res) => {
   try {
     const employees = await User.find().select(
-      "name employeeId department designation salary"
+      "name employeeId department designation salary basicPay hra allowances deductions"
     );
 
     return res.status(200).json({
@@ -45,7 +45,7 @@ export const getAllPayroll = async (req, res) => {
 // HR - Update Payroll
 export const updatePayroll = async (req, res) => {
   try {
-    const { salary, department, designation } = req.body;
+    const { basicPay, hra, allowances, deductions, department, designation } = req.body;
 
     const employee = await User.findById(req.params.id);
 
@@ -56,9 +56,21 @@ export const updatePayroll = async (req, res) => {
       });
     }
 
-    if (salary !== undefined) employee.salary = salary;
-    if (department) employee.department = department;
-    if (designation) employee.designation = designation;
+    if (basicPay !== undefined) employee.basicPay = Number(basicPay);
+    if (hra !== undefined) employee.hra = Number(hra);
+    if (allowances !== undefined) employee.allowances = Number(allowances);
+    if (deductions !== undefined) employee.deductions = Number(deductions);
+
+    // Calculate total salary dynamically
+    const finalBasic = basicPay !== undefined ? Number(basicPay) : (employee.basicPay || 0);
+    const finalHra = hra !== undefined ? Number(hra) : (employee.hra || 0);
+    const finalAllowances = allowances !== undefined ? Number(allowances) : (employee.allowances || 0);
+    const finalDeductions = deductions !== undefined ? Number(deductions) : (employee.deductions || 0);
+    
+    employee.salary = finalBasic + finalHra + finalAllowances - finalDeductions;
+
+    if (department !== undefined) employee.department = department;
+    if (designation !== undefined) employee.designation = designation;
 
     await employee.save();
 

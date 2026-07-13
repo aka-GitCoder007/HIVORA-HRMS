@@ -7,6 +7,7 @@ import {
 } from "../controllers/payrollController.js";
 
 import { protect, isHR } from "../middleware/authMiddleware.js";
+import { payrollValidation, validate } from "../middleware/validator.js";
 
 const router = express.Router();
 
@@ -15,6 +16,6 @@ router.get("/my", protect, getMyPayroll);
 
 // HR
 router.get("/all", protect, isHR, getAllPayroll);
-router.put("/:id", protect, isHR, updatePayroll);
+router.put("/:id", protect, isHR, payrollValidation, validate, updatePayroll);
 
 export default router;

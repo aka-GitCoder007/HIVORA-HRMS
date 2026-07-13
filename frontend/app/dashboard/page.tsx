@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/authContext'
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { MainLayout } from '@/components/MainLayout'
 import { ProfileView } from '@/components/profile/ProfileView'
 import { AttendanceEmployee } from '@/components/attendance/AttendanceEmployee'
@@ -11,6 +12,7 @@ import { LeaveEmployee } from '@/components/leave/LeaveEmployee'
 import { LeaveAdmin } from '@/components/leave/LeaveAdmin'
 import { PayrollEmployee } from '@/components/payroll/PayrollEmployee'
 import { PayrollAdmin } from '@/components/payroll/PayrollAdmin'
+import { EmployeeDirectory } from '@/components/admin/EmployeeDirectory'
 
 export default function Dashboard() {
   const router = useRouter()
@@ -49,20 +51,24 @@ export default function Dashboard() {
         ) : (
           <PayrollAdmin />
         )
+      case 'Employee Directory':
+        return user.role === 'admin' ? <EmployeeDirectory /> : null
       default:
         return null
     }
   }
 
   return (
-    <main className="flex flex-col h-screen bg-white dark:bg-slate-950">
-      <MainLayout
-        currentUser={user}
-        activeSection={currentSection}
-        onSectionChange={setCurrentSection}
-      >
-        {renderContent()}
-      </MainLayout>
-    </main>
+    <ProtectedRoute>
+      <main className="flex flex-col h-screen bg-white dark:bg-slate-950">
+        <MainLayout
+          currentUser={user}
+          activeSection={currentSection}
+          onSectionChange={setCurrentSection}
+        >
+          {renderContent()}
+        </MainLayout>
+      </main>
+    </ProtectedRoute>
   )
 }

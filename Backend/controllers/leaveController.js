@@ -5,6 +5,20 @@ export const applyLeave = async (req, res) => {
   try {
     const { leaveType, startDate, endDate, remarks } = req.body;
 
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: "Start date and End date are required.",
+      });
+    }
+
+    if (new Date(startDate) > new Date(endDate)) {
+      return res.status(400).json({
+        success: false,
+        message: "Start date cannot be after end date.",
+      });
+    }
+
     const leave = await Leave.create({
       employee: req.user._id,
       leaveType,

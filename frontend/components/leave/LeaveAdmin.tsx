@@ -2,23 +2,27 @@
 
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Check, X, MessageCircle } from 'lucide-react'
+import { Check, X, MessageCircle, Loader2, FileText } from 'lucide-react'
 import { StatusBadge } from '../StatusBadge'
 import { fetchAllLeaves, updateLeaveStatus } from '@/lib/api'
+import { toast } from 'sonner'
 
 export function LeaveAdmin() {
   const [requests, setRequests] = useState<any[]>([])
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all')
   const [commentingId, setCommentingId] = useState<string | null>(null)
-  const [comment, setComment] = useState('')
+  const [comments, setComments] = useState<Record<string, string>>({})
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const loadLeaves = async () => {
       try {
         const data = await fetchAllLeaves()
         setRequests(data)
-      } catch (error) {
-        console.error(error)
+      } catch (error: any) {
+        toast.error(error?.response?.data?.message || 'Failed to load leaves data')
+      } finally {
+        setIsLoading(false)
       }
     }
 
@@ -29,36 +33,64 @@ export function LeaveAdmin() {
 
   const handleApprove = async (id: string) => {
     try {
-      await updateLeaveStatus(id, { status: 'Approved', hrComment: comment })
+      const commentText = comments[id] || ''
+      await updateLeaveStatus(id, { status: 'Approved', hrComment: commentText })
+      setComments(prev => {
+        const copy = { ...prev }
+        delete copy[id]
+        return copy
+      })
       const data = await fetchAllLeaves()
       setRequests(data)
-    } catch (error) {
-      console.error(error)
+      toast.success('Leave approved successfully')
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to approve leave')
     }
   }
 
   const handleReject = async (id: string) => {
     try {
-      await updateLeaveStatus(id, { status: 'Rejected', hrComment: comment })
+      const commentText = comments[id] || ''
+      await updateLeaveStatus(id, { status: 'Rejected', hrComment: commentText })
+      setComments(prev => {
+        const copy = { ...prev }
+        delete copy[id]
+        return copy
+      })
       const data = await fetchAllLeaves()
       setRequests(data)
-    } catch (error) {
-      console.error(error)
+      toast.success('Leave rejected successfully')
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to reject leave')
     }
   }
 
   const handleAddComment = async (id: string) => {
-    if (comment.trim()) {
+    const commentText = comments[id] || ''
+    if (commentText.trim()) {
       try {
-        await updateLeaveStatus(id, { status: 'Pending', hrComment: comment })
+        await updateLeaveStatus(id, { status: 'Pending', hrComment: commentText })
+        setComments(prev => {
+          const copy = { ...prev }
+          delete copy[id]
+          return copy
+        })
         const data = await fetchAllLeaves()
         setRequests(data)
-        setComment('')
         setCommentingId(null)
-      } catch (error) {
-        console.error(error)
+        toast.success('Comment added successfully')
+      } catch (error: any) {
+        toast.error(error?.response?.data?.message || 'Failed to add comment')
       }
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+      </div>
+    )
   }
 
   return (
@@ -158,8 +190,8 @@ export function LeaveAdmin() {
                       {commentingId === request.id && (
                         <div className="space-y-2">
                           <textarea
-                            value={comment}
-                            onChange={(e) => setComment(e.target.value)}
+                            value={comments[request.id] || ''}
+                            onChange={(e) => setComments(prev => ({ ...prev, [request.id]: e.target.value }))}
                             placeholder="Add a comment for the employee..."
                             rows={2}
                             className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
@@ -175,7 +207,11 @@ export function LeaveAdmin() {
                             <Button
                               onClick={() => {
                                 setCommentingId(null)
-                                setComment('')
+                                setComments(prev => {
+                                  const copy = { ...prev }
+                                  delete copy[request.id]
+                                  return copy
+                                })
                               }}
                               size="sm"
                               variant="outline"
@@ -201,8 +237,9 @@ export function LeaveAdmin() {
         })}
 
         {filteredRequests.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-foreground/50">No {filter !== 'all' ? filter : ''} leave requests</p>
+          <div className="flex flex-col items-center justify-center py-12 text-foreground/50 border border-dashed border-border/50 rounded-lg">
+            <FileText className="h-12 w-12 text-foreground/30 mb-3" />
+            <p className="text-lg font-medium">No {filter !== 'all' ? filter : ''} leave requests found</p>
           </div>
         )}
       </div>

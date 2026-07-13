@@ -29,9 +29,15 @@ export const protect = async (req, res, next) => {
 
     next();
   } catch (error) {
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({
+        success: false,
+        message: "Session expired",
+      });
+    }
     return res.status(401).json({
       success: false,
-      message: "Invalid or expired token.",
+      message: "Invalid token.",
     });
   }
 };
@@ -41,6 +47,17 @@ export const isHR = (req, res, next) => {
     return res.status(403).json({
       success: false,
       message: "Access denied. HR only.",
+    });
+  }
+
+  next();
+};
+
+export const isEmployee = (req, res, next) => {
+  if (req.user.role !== "Employee") {
+    return res.status(403).json({
+      success: false,
+      message: "Access denied. Employee only.",
     });
   }
 

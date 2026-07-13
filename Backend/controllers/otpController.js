@@ -7,9 +7,18 @@ import sendEmail from "../utils/sendEmail.js";
 export const sendOTP = async (req, res) => {
   try {
     const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
 
     // Check user exists
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
       return res.status(404).json({
@@ -62,7 +71,16 @@ export const verifyOTP = async (req, res) => {
 
     const { email, otp } = req.body;
 
-    const otpData = await OTP.findOne({ email });
+    if (!email || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and OTP are required",
+      });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const otpData = await OTP.findOne({ email: normalizedEmail });
 
     if (!otpData) {
       return res.status(404).json({
@@ -79,13 +97,13 @@ export const verifyOTP = async (req, res) => {
     }
 
     await User.findOneAndUpdate(
-      { email },
+      { email: normalizedEmail },
       {
         isVerified: true,
       }
     );
 
-    await OTP.deleteMany({ email });
+    await OTP.deleteMany({ email: normalizedEmail });
 
     return res.status(200).json({
       success: true,

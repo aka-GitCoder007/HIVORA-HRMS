@@ -69,12 +69,70 @@ const userSchema = new mongoose.Schema(
       default: "",
     },
 
+    dob: {
+      type: String,
+      default: "",
+    },
+
+    gender: {
+      type: String,
+      default: "",
+    },
+
+    emergencyContact: {
+      type: String,
+      default: "",
+    },
+
+    emergencyPhone: {
+      type: String,
+      default: "",
+    },
+
+    joiningDate: {
+      type: String,
+      default: "",
+    },
+
+    reportingManager: {
+      type: String,
+      default: "",
+    },
+
+    basicPay: {
+      type: Number,
+      default: 0,
+    },
+
+    hra: {
+      type: Number,
+      default: 0,
+    },
+
+    allowances: {
+      type: Number,
+      default: 0,
+    },
+
+    deductions: {
+      type: Number,
+      default: 0,
+    },
+
     documents: [
       {
         name: String,
         url: String,
       },
     ],
+
+    resetPasswordToken: {
+      type: String,
+    },
+
+    resetPasswordExpires: {
+      type: Date,
+    },
   },
   {
     timestamps: true,

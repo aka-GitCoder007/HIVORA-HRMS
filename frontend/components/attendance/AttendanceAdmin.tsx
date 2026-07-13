@@ -3,48 +3,93 @@
 import { useEffect, useState } from 'react'
 import { Calendar, Search } from 'lucide-react'
 import { StatusBadge } from '../StatusBadge'
-import { fetchAllAttendance } from '@/lib/api'
+import { fetchAllAttendance, fetchAllPayroll } from '@/lib/api'
+import { toast } from 'sonner'
+import { Loader2 } from 'lucide-react'
 
 export function AttendanceAdmin() {
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('en-CA'))
   const [view, setView] = useState<'daily' | 'weekly'>('daily')
   const [searchQuery, setSearchQuery] = useState('')
   const [attendance, setAttendance] = useState<any[]>([])
+  const [employees, setEmployees] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const loadAttendance = async () => {
+    const loadData = async () => {
       try {
         const records = await fetchAllAttendance()
         setAttendance(records)
-      } catch (error) {
-        console.error(error)
+        const emps = await fetchAllPayroll()
+        setEmployees(emps)
+      } catch (error: any) {
+        toast.error(error?.response?.data?.message || 'Failed to load attendance records')
+      } finally {
+        setIsLoading(false)
       }
     }
 
-    void loadAttendance()
+    void loadData()
   }, [])
 
-  const getAttendanceForDate = (date: string) => {
-    return attendance.filter((r: any) => r.date === date)
+  const getPastWeekDates = (baseDateStr: string) => {
+    const dates = []
+    const baseDate = new Date(baseDateStr)
+    const day = baseDate.getDay()
+    const diff = baseDate.getDate() - day + (day === 0 ? -6 : 1)
+    const monday = new Date(baseDate.setDate(diff))
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday)
+      d.setDate(monday.getDate() + i)
+      dates.push({
+        dateStr: d.toLocaleDateString('en-CA'),
+        dayName: d.toLocaleDateString('en-US', { weekday: 'short' }),
+      })
+    }
+    return dates
   }
 
-  const filteredRecords = getAttendanceForDate(selectedDate).filter((record: any) => {
+  const weekDates = getPastWeekDates(selectedDate)
+
+  const normalizedSearch = searchQuery.trim().toLowerCase()
+
+  // Generate records for all employees on the selected date
+  const allEmployeeRecords = employees.map((employee: any) => {
+    const recordForToday = attendance.find(
+      (r: any) => r.employeeId === employee.employeeId && r.date === selectedDate
+    )
+    return {
+      employee: {
+        id: employee.id || employee.employeeId,
+        name: employee.employeeName || employee.name,
+        employeeId: employee.employeeId,
+        department: employee.department,
+      },
+      attendance: recordForToday || null,
+    }
+  })
+
+  const filteredRecords = allEmployeeRecords.filter((item: any) => {
+    const employeeName = String(item.employee.name || '').toLowerCase()
+    const employeeId = String(item.employee.employeeId || '').toLowerCase()
+    const department = String(item.employee.department || '').toLowerCase()
+
     return (
-      record.employeeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      record.employeeId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      record.department.toLowerCase().includes(searchQuery.toLowerCase())
+      !normalizedSearch ||
+      employeeName.includes(normalizedSearch) ||
+      employeeId.includes(normalizedSearch) ||
+      department.includes(normalizedSearch)
     )
   })
 
-  const allEmployeeRecords = filteredRecords.map((record: any) => ({
-    employee: {
-      id: record.id,
-      name: record.employeeName,
-      employeeId: record.employeeId,
-      department: record.department,
-    },
-    attendance: record,
-  }))
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -117,20 +162,28 @@ export function AttendanceAdmin() {
                 </tr>
               </thead>
               <tbody>
-                {allEmployeeRecords.map((item) => (
-                  <tr key={item.employee.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
-                    <td className="py-4 px-6 text-foreground font-medium">{item.employee.name}</td>
-                    <td className="py-4 px-6 text-foreground text-xs font-mono bg-muted/30 rounded w-fit">
-                      {item.employee.employeeId}
-                    </td>
-                    <td className="py-4 px-6 text-foreground/70">{item.employee.department}</td>
-                    <td className="py-4 px-6 text-foreground">{item.attendance?.checkInTime || '-'}</td>
-                    <td className="py-4 px-6 text-foreground">{item.attendance?.checkOutTime || '-'}</td>
-                    <td className="py-4 px-6">
-                      <StatusBadge status={item.attendance?.status || 'absent'} />
+                {filteredRecords.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-foreground/50">
+                      No attendance records found for this date.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredRecords.map((item) => (
+                    <tr key={item.employee.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
+                      <td className="py-4 px-6 text-foreground font-medium">{item.employee.name}</td>
+                      <td className="py-4 px-6 text-foreground text-xs font-mono bg-muted/30 rounded w-fit">
+                        {item.employee.employeeId}
+                      </td>
+                      <td className="py-4 px-6 text-foreground/70">{item.employee.department}</td>
+                      <td className="py-4 px-6 text-foreground">{item.attendance?.checkInTime || '-'}</td>
+                      <td className="py-4 px-6 text-foreground">{item.attendance?.checkOutTime || '-'}</td>
+                      <td className="py-4 px-6">
+                        <StatusBadge status={item.attendance?.status || 'absent'} />
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -145,18 +198,23 @@ export function AttendanceAdmin() {
             Weekly Attendance Grid
           </h2>
 
-          <div className="space-y-4">
-            {attendance.slice(0, 5).map((record: any) => (
-              <div key={record.id} className="border border-border rounded-lg p-4">
-                <p className="font-semibold mb-3">{record.employeeName} ({record.employeeId})</p>
+          <div className="space-y-4 overflow-x-auto">
+            {employees.length === 0 ? (
+              <p className="text-center text-foreground/50 py-4">No employees found.</p>
+            ) : (
+              employees.map((employee: any) => (
+              <div key={employee.employeeId} className="border border-border rounded-lg p-4">
+                <p className="font-semibold mb-3">{employee.employeeName || employee.name} ({employee.employeeId})</p>
                 <div className="grid grid-cols-7 gap-2">
-                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, idx) => {
+                  {weekDates.map((wDate) => {
                     const matchingRecord = attendance.find(
-                      (item: any) => item.employeeId === record.employeeId && item.date === `2024-01-${String(8 + idx).padStart(2, '0')}`
+                      (item: any) => item.employeeId === employee.employeeId && item.date === wDate.dateStr
                     )
                     return (
-                      <div key={day} className="text-center">
-                        <div className="text-xs text-foreground/60 mb-1">{day}</div>
+                      <div key={wDate.dateStr} className="text-center">
+                        <div className="text-xs text-foreground/60 mb-1" title={wDate.dateStr}>
+                          {wDate.dayName}
+                        </div>
                         <div className="flex justify-center">
                           <div
                             className={`w-10 h-10 rounded-lg flex items-center justify-center text-xs font-semibold ${
@@ -188,7 +246,7 @@ export function AttendanceAdmin() {
                   })}
                 </div>
               </div>
-            ))}
+            )))}
           </div>
 
           <div className="grid grid-cols-4 gap-4 mt-6 pt-6 border-t border-border">

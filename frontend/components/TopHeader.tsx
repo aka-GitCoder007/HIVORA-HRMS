@@ -3,6 +3,7 @@
 import { useAuth } from '@/lib/authContext'
 import { LogOut, Menu } from 'lucide-react'
 import { useState } from 'react'
+import { HivoraWordmark } from '@/components/ui/HivoraWordmark'
 
 export function TopHeader() {
   const { user, logout } = useAuth()
@@ -18,12 +19,9 @@ export function TopHeader() {
       <div className="flex items-center justify-between px-4 sm:px-6 py-4">
         {/* Left side - Logo/Title */}
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-lg bg-cyan-600 flex items-center justify-center">
-            <span className="text-white font-bold text-sm">EMS</span>
-          </div>
-          <h1 className="text-lg font-semibold text-white">
-            Employee Management
-          </h1>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/apple-touch-icon.png" alt="HIVORA Logo" className="h-8 w-8 rounded-lg object-cover" />
+          <HivoraWordmark size="text-lg" />
         </div>
 
         {/* Right side - User Menu */}
@@ -35,8 +33,12 @@ export function TopHeader() {
               className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-800 transition-colors"
             >
               {/* Avatar */}
-              <div className="h-8 w-8 rounded-full bg-cyan-600 flex items-center justify-center text-white text-sm font-semibold">
-                {user?.avatar}
+              <div className="h-8 w-8 rounded-full bg-cyan-600 flex items-center justify-center text-white text-sm font-semibold overflow-hidden">
+                {user?.profilePicture ? (
+                  <img src={user.profilePicture} alt={user.name} className="h-full w-full object-cover" />
+                ) : (
+                  user?.avatar
+                )}
               </div>
 
               {/* User Name - Hidden on mobile */}

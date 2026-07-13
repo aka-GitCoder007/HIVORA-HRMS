@@ -2,62 +2,98 @@
 
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { MapPin, Phone, Mail, User, Briefcase, Calendar, Users } from 'lucide-react'
-import { fetchMyPayroll, fetchProfile, updateProfile } from '@/lib/api'
+import { MapPin, Phone, Mail, User, Briefcase, Calendar, Users, Loader2 } from 'lucide-react'
+import { fetchMyPayroll, fetchProfile, updateEmployeeProfileByHR, uploadImage } from '@/lib/api'
 import { useAuth } from '@/lib/authContext'
+import { toast } from 'sonner'
 
 interface ProfileViewProps {
   isAdmin?: boolean
 }
 
 export function ProfileView({ isAdmin = false }: ProfileViewProps) {
-  const { user } = useAuth()
+  const { user, restoreSession } = useAuth()
   const [currentUser, setCurrentUser] = useState<any | null>(null)
-  const [selectedEmployee, setSelectedEmployee] = useState<any | null>(null)
   const [editingMode, setEditingMode] = useState(false)
   const [editedUser, setEditedUser] = useState<any | null>(null)
   const [salary, setSalary] = useState<any | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isUploading, setIsUploading] = useState(false)
 
   useEffect(() => {
     const loadProfile = async () => {
       try {
         const profileResponse = await fetchProfile()
         const payrollResponse = await fetchMyPayroll()
-        setCurrentUser(profileResponse.user)
-        setSalary(payrollResponse)
-      } catch (error) {
-        console.error(error)
+        setCurrentUser(profileResponse?.user || null)
+        setSalary(payrollResponse || null)
+      } catch (error: any) {
+        toast.error(error?.response?.data?.message || 'Failed to load profile data')
+        setCurrentUser(null)
+        setSalary(null)
+      } finally {
+        setIsLoading(false)
       }
     }
 
     void loadProfile()
   }, [])
 
-  const displayedUser = selectedEmployee || currentUser
-  const safeUser = displayedUser || {}
+  const safeUser = currentUser || {}
 
   const handleEdit = () => {
-    if (isAdmin && displayedUser) {
-      setEditedUser({ ...displayedUser })
+    if (currentUser) {
+      setEditedUser({ ...currentUser })
       setEditingMode(true)
     }
   }
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setIsUploading(true)
+    try {
+      const data = await uploadImage(file)
+      setEditedUser((prev: any) => ({ ...prev, profilePicture: data.url }))
+      toast.success('Image uploaded successfully')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to upload image')
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
   const handleSave = async () => {
-    if (editedUser) {
-      try {
-        await updateProfile({
-          address: editedUser.address,
-          phone: editedUser.phone,
-        })
-        if (selectedEmployee) {
-          setSelectedEmployee(editedUser)
-        } else {
-          setCurrentUser(editedUser)
-        }
-      } catch (error) {
-        console.error(error)
+    if (!editedUser) return
+    try {
+      const targetId = currentUser?._id || currentUser?.id
+
+      if (!targetId) {
+        console.error('Save failed: no valid target ID found')
+        return
       }
+
+      await updateEmployeeProfileByHR(targetId, {
+        name: editedUser.name,
+        dob: editedUser.dob,
+        gender: editedUser.gender,
+        phone: editedUser.phone,
+        address: editedUser.address,
+        emergencyContact: editedUser.emergencyContact,
+        emergencyPhone: editedUser.emergencyPhone,
+        designation: editedUser.designation,
+        department: editedUser.department,
+        joiningDate: editedUser.joiningDate,
+        reportingManager: editedUser.reportingManager,
+        profilePicture: editedUser.profilePicture,
+      })
+      toast.success('Profile updated successfully')
+      setCurrentUser((prev: any) => ({ ...prev, ...editedUser }))
+      
+      // Update global auth context so TopHeader updates immediately
+      void restoreSession()
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to update profile')
     }
     setEditingMode(false)
     setEditedUser(null)
@@ -74,33 +110,42 @@ export function ProfileView({ isAdmin = false }: ProfileViewProps) {
     }
   }
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      {/* Employee Selector for Admin */}
-      {isAdmin && (
-        <div className="bg-card border border-border rounded-xl p-6">
-          <label className="block text-sm font-medium mb-3">Select Employee</label>
-          <select
-            value={selectedEmployee?.id || ''}
-            onChange={(e) => {
-              const employee = user
-              setSelectedEmployee(employee || null)
-              setEditingMode(false)
-            }}
-            className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">View Your Profile</option>
-            <option value={user?.id || ''}>{user?.name || 'Current User'} ({user?.employeeId || ''})</option>
-          </select>
-        </div>
-      )}
-
       {/* Profile Header */}
       <div className="bg-linear-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 border border-blue-200 dark:border-blue-800 rounded-xl p-8">
         <div className="flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
           <div className="flex gap-6 items-start">
-            <div className="w-24 h-24 rounded-full bg-linear-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-3xl font-bold shrink-0">
-              {(safeUser.name || 'U').charAt(0)}
+            <div className="relative group w-24 h-24 shrink-0 rounded-full bg-linear-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-3xl font-bold overflow-hidden">
+              {(editingMode ? editedUser?.profilePicture : safeUser.profilePicture) ? (
+                <img
+                  src={editingMode ? editedUser.profilePicture : safeUser.profilePicture}
+                  alt={safeUser.name || 'User'}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                (safeUser.name || 'U').charAt(0)
+              )}
+              {editingMode && (
+                <label className="absolute inset-0 flex items-center justify-center bg-black/50 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">
+                  {isUploading ? (
+                    <Loader2 className="w-6 h-6 text-white animate-spin" />
+                  ) : (
+                    <div className="flex flex-col items-center">
+                      <span className="text-white text-xs mt-1">Upload</span>
+                    </div>
+                  )}
+                  <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={isUploading} />
+                </label>
+              )}
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-foreground">{safeUser.name || 'Loading profile...'}</h1>

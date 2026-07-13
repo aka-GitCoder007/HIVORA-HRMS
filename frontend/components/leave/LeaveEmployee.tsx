@@ -6,6 +6,8 @@ import { Calendar, Send } from 'lucide-react'
 import { StatusBadge } from '../StatusBadge'
 import { applyLeave, fetchMyLeaves } from '@/lib/api'
 import { useAuth } from '@/lib/authContext'
+import { toast } from 'sonner'
+import { Loader2, FileText } from 'lucide-react'
 
 interface LeaveEmployeeProps {
   employeeId?: string
@@ -21,14 +23,18 @@ export function LeaveEmployee({ employeeId = '' }: LeaveEmployeeProps) {
     remarks: '',
   })
   const [submittedRequests, setSubmittedRequests] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     const loadLeaves = async () => {
       try {
         const requests = await fetchMyLeaves()
         setSubmittedRequests(requests)
-      } catch (error) {
-        console.error(error)
+      } catch (error: any) {
+        toast.error(error?.response?.data?.message || 'Failed to load leave history')
+      } finally {
+        setIsLoading(false)
       }
     }
 
@@ -37,27 +43,39 @@ export function LeaveEmployee({ employeeId = '' }: LeaveEmployeeProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsSubmitting(true)
     try {
       const payload = {
-        leaveType: formData.type === 'sick' ? 'Sick' : formData.type === 'unpaid' ? 'Unpaid' : 'Paid',
+        leaveType: (formData.type === 'sick' ? 'Sick' : formData.type === 'unpaid' ? 'Unpaid' : 'Paid') as 'Paid' | 'Sick' | 'Unpaid',
         startDate: formData.startDate,
         endDate: formData.endDate,
         remarks: formData.remarks,
       }
       const response = await applyLeave(payload)
       if (response.success) {
+        toast.success('Leave request submitted successfully')
         const requests = await fetchMyLeaves()
         setSubmittedRequests(requests)
       }
       setFormData({ type: 'paid', startDate: '', endDate: '', remarks: '' })
       setIsFormOpen(false)
-    } catch (error) {
-      console.error(error)
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to submit leave request')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   const handleFormChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+      </div>
+    )
   }
 
   return (
@@ -139,9 +157,10 @@ export function LeaveEmployee({ employeeId = '' }: LeaveEmployeeProps) {
               </Button>
               <Button
                 type="submit"
-                className="bg-green-600 hover:bg-green-700 text-white"
+                disabled={isSubmitting}
+                className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
               >
-                <Send className="w-4 h-4 mr-2" />
+                {isSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
                 Submit Request
               </Button>
             </div>
@@ -180,14 +199,26 @@ export function LeaveEmployee({ employeeId = '' }: LeaveEmployeeProps) {
           ))}
 
           {submittedRequests.length === 0 && (
-            <p className="text-center text-foreground/50 py-8">No leave requests yet</p>
+            <div className="flex flex-col items-center justify-center py-12 text-foreground/50 border border-dashed border-border/50 rounded-lg">
+              <FileText className="h-12 w-12 text-foreground/30 mb-3" />
+              <p className="text-lg font-medium">No leave requests found</p>
+              <p className="text-sm">You haven't applied for any leaves yet.</p>
+            </div>
           )}
         </div>
       </div>
 
       {/* Monthly Calendar */}
       <div className="bg-card border border-border rounded-xl p-6">
-        <h2 className="text-lg font-semibold mb-6">Monthly Attendance Overview</h2>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-semibold">Monthly Attendance Overview</h2>
+          <span className="text-sm text-foreground/60">
+            {(() => {
+              const todayDate = new Date()
+              return todayDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+            })()}
+          </span>
+        </div>
 
         <div className="grid grid-cols-7 gap-1 text-center">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
@@ -196,24 +227,44 @@ export function LeaveEmployee({ employeeId = '' }: LeaveEmployeeProps) {
             </div>
           ))}
 
-          {Array.from({ length: 31 }, (_, i) => {
-            const date = `2024-01-${String(i + 1).padStart(2, '0')}`
-            const record = submittedRequests.find((r: any) => r.startDate <= date && r.endDate >= date)
-            const isLeaveDay = record?.status !== 'rejected'
+          {(() => {
+            const todayDate = new Date()
+            const currentYear = todayDate.getFullYear()
+            const currentMonth = todayDate.getMonth()
+            const totalDaysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate()
+            const startDayOfWeek = new Date(currentYear, currentMonth, 1).getDay()
+            const monthPrefix = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-`
 
-            return (
-              <div
-                key={i}
-                className={`aspect-square flex items-center justify-center rounded text-xs font-medium border transition-colors ${
-                  isLeaveDay && record
-                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-300 dark:border-blue-700'
-                    : 'bg-muted/50 text-foreground/70 border-border'
-                }`}
-              >
-                {i + 1}
-              </div>
-            )
-          })}
+            const calendarCells = []
+
+            // Render empty cells for padding
+            for (let i = 0; i < startDayOfWeek; i++) {
+              calendarCells.push(<div key={`empty-${i}`} className="aspect-square" />)
+            }
+
+            // Render actual day cells
+            for (let i = 1; i <= totalDaysInMonth; i++) {
+              const date = `${monthPrefix}${String(i).padStart(2, '0')}`
+              const record = submittedRequests.find((r: any) => r.startDate <= date && r.endDate >= date)
+              const isLeaveDay = record?.status !== 'rejected'
+
+              calendarCells.push(
+                <div
+                  key={`day-${i}`}
+                  className={`aspect-square flex items-center justify-center rounded text-xs font-medium border transition-colors ${
+                    isLeaveDay && record
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-300 dark:border-blue-700'
+                      : 'bg-muted/50 text-foreground/70 border-border'
+                  }`}
+                  title={record ? `${record.remarks} (${record.status})` : undefined}
+                >
+                  {i}
+                </div>
+              )
+            }
+
+            return calendarCells
+          })()}
         </div>
       </div>
     </div>

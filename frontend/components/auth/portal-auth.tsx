@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import type { LucideIcon } from "lucide-react"
 import {
@@ -24,8 +24,8 @@ export type PortalTheme = {
   icon: LucideIcon
   description: string
   lockedRole: string
-  demoEmail: string
-  demoPassword: string
+  demoEmail?: string
+  demoPassword?: string
   securityNote?: string
   /* class strings */
   accentText: string
@@ -66,6 +66,21 @@ export function PortalAuth({
   const [remember, setRemember] = useState(false)
 
   const Icon = theme.icon
+
+  // Load saved credentials on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`hivora_remember_${theme.variant}`)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (parsed.email) setEmail(parsed.email)
+        if (parsed.password) setPassword(parsed.password)
+        setRemember(true)
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }, [theme.variant])
 
   function switchMode(next: Mode) {
     if (next === mode) return
@@ -117,7 +132,9 @@ export function PortalAuth({
             type: "success",
             msg: response.message || `Account created for ${theme.lockedRole}. Please verify your email.`,
           })
-          router.push(`/verify-otp?email=${encodeURIComponent(email.trim().toLowerCase())}`)
+          if (typeof window !== 'undefined') {
+            router.push(`/verify-otp?email=${encodeURIComponent(email.trim().toLowerCase())}`)
+          }
         } else {
           setBanner({ type: "error", msg: response.message || "Signup failed." })
           setShakeKey((k) => k + 1)
@@ -126,14 +143,28 @@ export function PortalAuth({
         const response = await loginUser({
           email: email.trim().toLowerCase(),
           password,
+          portal: theme.variant,
         })
 
         if (response.success && response.token) {
           const normalizedUser = normalizeUser(response.user)
           await login(normalizedUser, response.token)
+
+          // Save or clear remembered credentials
+          if (remember) {
+            localStorage.setItem(
+              `hivora_remember_${theme.variant}`,
+              JSON.stringify({ email: email.trim().toLowerCase(), password })
+            )
+          } else {
+            localStorage.removeItem(`hivora_remember_${theme.variant}`)
+          }
+
           setBanner({ type: "success", msg: "Signed in successfully. Redirecting…" })
           setTimeout(() => {
-            router.push("/dashboard")
+            if (typeof window !== 'undefined') {
+              router.push("/dashboard")
+            }
           }, 800)
         } else {
           setBanner({ type: "error", msg: response.message || "Invalid credentials. Please try again." })
@@ -186,28 +217,30 @@ export function PortalAuth({
       {/* body */}
       <div className={cn("rounded-b-2xl border bg-card p-6 shadow-xl", theme.accentBorder)}>
         {/* tabs */}
-        <div
-          role="tablist"
-          aria-label={`${theme.name} authentication`}
-          className="mb-5 grid grid-cols-2 gap-1 rounded-lg bg-muted p-1"
-        >
-          {(["signin", "signup"] as const).map((m) => (
-            <button
-              key={m}
-              role="tab"
-              aria-selected={mode === m}
-              onClick={() => switchMode(m)}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                mode === m
-                  ? cn("shadow-sm", theme.tabActive)
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {m === "signin" ? "Sign In" : "Sign Up"}
-            </button>
-          ))}
-        </div>
+        {theme.variant !== "admin" && (
+          <div
+            role="tablist"
+            aria-label={`${theme.name} authentication`}
+            className="mb-5 grid grid-cols-2 gap-1 rounded-lg bg-muted p-1"
+          >
+            {(["signin", "signup"] as const).map((m) => (
+              <button
+                key={m}
+                role="tab"
+                aria-selected={mode === m}
+                onClick={() => switchMode(m)}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  mode === m
+                    ? cn("shadow-sm", theme.tabActive)
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {m === "signin" ? "Sign In" : "Sign Up"}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* banner */}
         {banner && (
@@ -336,7 +369,12 @@ export function PortalAuth({
                 <input
                   type="checkbox"
                   checked={remember}
-                  onChange={(e) => setRemember(e.target.checked)}
+                  onChange={(e) => {
+                    setRemember(e.target.checked)
+                    if (!e.target.checked) {
+                      localStorage.removeItem(`hivora_remember_${theme.variant}`)
+                    }
+                  }}
                   className={cn(
                     "size-4 rounded border-input accent-current",
                     theme.accentText,
@@ -346,6 +384,7 @@ export function PortalAuth({
               </label>
               <button
                 type="button"
+                onClick={() => router.push('/forgot-password')}
                 className={cn(
                   "text-sm font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded",
                   theme.accentText,
@@ -373,7 +412,7 @@ export function PortalAuth({
                 : "Create Account"}
           </button>
 
-          {mode === "signin" && (
+          {mode === "signin" && theme.demoEmail && theme.demoPassword && (
             <p className="text-center text-xs text-muted-foreground">
               Demo credentials: {theme.demoEmail} / {theme.demoPassword}
             </p>

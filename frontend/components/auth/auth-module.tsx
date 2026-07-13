@@ -1,10 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { Building2 } from "lucide-react"
 import { RoleSelector } from "./role-selector"
 import { EmployeeAuthPanel } from "./employee-auth-panel"
 import { AdminAuthPanel } from "./admin-auth-panel"
+import { HivoraWordmark } from "@/components/ui/HivoraWordmark"
 
 export type Role = "employee" | "admin"
 
@@ -13,14 +13,11 @@ export function AuthModule() {
 
   return (
     <main className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden bg-gradient-to-b from-muted/60 via-background to-muted/40 px-4 py-10">
-      {/* company logo placeholder */}
-      <header className="mb-8 flex items-center gap-2">
-        <span className="flex size-9 items-center justify-center rounded-lg bg-foreground text-background">
-          <Building2 className="size-5" aria-hidden="true" />
-        </span>
-        <span className="text-base font-semibold tracking-tight text-foreground">
-          Workforce
-        </span>
+      {/* company logo */}
+      <header className="mb-8 flex items-center gap-3">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/apple-touch-icon.png" alt="HIVORA Logo" className="size-10 rounded-xl object-cover shadow-md" />
+        <HivoraWordmark size="text-base" />
       </header>
 
       {role === null && <RoleSelector onSelect={setRole} />}

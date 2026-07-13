@@ -3,27 +3,17 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { AuthProvider } from '@/lib/authContext'
 import { ThemeProvider } from '@/lib/themeContext'
+import { SplashScreen } from '@/components/ui/SplashScreen'
+import { Toaster } from 'sonner'
 
 export const metadata: Metadata = {
-  title: 'Employee Management System',
+  title: 'HIVORA - HRMS',
   description: 'Complete employee management platform with profile, attendance, leave, and payroll management',
   generator: 'v0.app',
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
+    icon: '/apple-touch-icon.png',
+    apple: '/apple-touch-icon.png',
+    shortcut: '/apple-touch-icon.png',
   },
 }
 
@@ -54,7 +44,9 @@ export default function RootLayout({
       <body className="antialiased bg-slate-950 text-gray-50">
         <AuthProvider>
           <ThemeProvider>
+            <SplashScreen />
             {children}
+            <Toaster richColors position="top-right" theme="dark" />
             {process.env.NODE_ENV === 'production' && <Analytics />}
           </ThemeProvider>
         </AuthProvider>

@@ -9,8 +9,6 @@ const adminTheme: PortalTheme = {
   icon: ShieldCheck,
   description: "Manage employees, attendance & payroll",
   lockedRole: "HR",
-  demoEmail: "admin@company.com",
-  demoPassword: "Password123",
   securityNote: "Admin access is monitored and logged",
   accentText: "text-admin",
   accentBg: "bg-admin",

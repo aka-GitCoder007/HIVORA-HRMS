@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Menu, X } from 'lucide-react'
+import { Menu, X, User, Clock, Calendar, DollarSign, Users } from 'lucide-react'
 import { TopHeader } from '@/components/TopHeader'
+import { HivoraWordmark } from '@/components/ui/HivoraWordmark'
 
 interface User {
   id: string
@@ -22,7 +23,18 @@ interface MainLayoutProps {
 export function MainLayout({ children, currentUser, activeSection, onSectionChange }: MainLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  const sections = ['Profile', 'Attendance', 'Leave', 'Payroll']
+  const isAdmin = currentUser.role === 'admin'
+
+  type NavItem = { label: string; icon: React.ElementType; adminOnly?: boolean }
+  const navItems: NavItem[] = [
+    { label: 'Profile', icon: User },
+    { label: 'Attendance', icon: Clock },
+    { label: 'Leave', icon: Calendar },
+    { label: 'Payroll', icon: DollarSign },
+    { label: 'Employee Directory', icon: Users, adminOnly: true },
+  ]
+
+  const visibleItems = navItems.filter(item => !item.adminOnly || isAdmin)
 
   return (
     <div className="flex flex-col h-screen bg-slate-950 text-gray-50 overflow-hidden">
@@ -39,28 +51,33 @@ export function MainLayout({ children, currentUser, activeSection, onSectionChan
         >
         <div className="h-full flex flex-col">
           {/* Logo */}
-          <div className="p-6 border-b border-slate-700">
-            <h1 className="text-xl font-bold text-cyan-400">EMS</h1>
-            <p className="text-xs text-gray-400">Employee Management</p>
+          <div className="p-6 border-b border-slate-700 flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/apple-touch-icon.png" alt="HIVORA Logo" className="w-9 h-9 rounded-lg object-cover" />
+            <div>
+              <HivoraWordmark size="text-base" />
+              <p className="text-xs text-gray-400">HIVORA HRMS</p>
+            </div>
           </div>
 
           {/* Navigation */}
           <nav className="flex-1 p-4 overflow-y-auto">
-            <div className="space-y-2">
-              {sections.map((section) => (
+            <div className="space-y-1">
+              {visibleItems.map(({ label, icon: Icon }) => (
                 <button
-                  key={section}
+                  key={label}
                   onClick={() => {
-                    onSectionChange(section)
+                    onSectionChange(label)
                     setSidebarOpen(false)
                   }}
-                  className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
-                    activeSection === section
+                  className={`w-full text-left flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${
+                    activeSection === label
                       ? 'bg-blue-900/40 text-cyan-400 font-medium'
                       : 'text-gray-300 hover:bg-slate-800'
                   }`}
                 >
-                  {section}
+                  <Icon className={`w-4 h-4 shrink-0 ${activeSection === label ? 'text-cyan-400' : 'text-slate-500'}`} />
+                  {label}
                 </button>
               ))}
             </div>

@@ -11,11 +11,12 @@ import {
   protect,
   isHR,
 } from "../middleware/authMiddleware.js";
+import { leaveValidation, validate } from "../middleware/validator.js";
 
 const router = express.Router();
 
 // Employee
-router.post("/apply", protect, applyLeave);
+router.post("/apply", protect, leaveValidation, validate, applyLeave);
 router.get("/my-leaves", protect, myLeaves);
 
 // HR

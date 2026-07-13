@@ -3,6 +3,7 @@
 import { ChevronRight, ShieldCheck, UserRound } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Role } from "./auth-module"
+import { HivoraWordmark } from "@/components/ui/HivoraWordmark"
 
 const roles = [
   {
@@ -30,10 +31,10 @@ export function RoleSelector({ onSelect }: { onSelect: (role: Role) => void }) {
     <div className="animate-slide-up w-full max-w-3xl">
       <div className="mb-8 text-center">
         <h1 className="text-balance text-2xl font-semibold text-foreground sm:text-3xl">
-          Welcome to Workforce
+          Welcome to <HivoraWordmark size="text-2xl sm:text-3xl" />
         </h1>
         <p className="mx-auto mt-2 max-w-md text-pretty text-sm text-muted-foreground">
-          Choose how you&apos;d like to sign in to your Employee Management System.
+          Choose how you&apos;d like to sign in to HIVORA.
         </p>
       </div>
 

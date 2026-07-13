@@ -12,18 +12,28 @@ import leaveRoutes from "./routes/leaveRoutes.js";
 import payrollRoutes from "./routes/payrollRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import otpRoutes from "./routes/otpRoutes.js";
+import uploadRoutes from "./routes/uploadRoutes.js";
+import path from "path";
+import { fileURLToPath } from "url";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-
-console.log("EMAIL_USER:", process.env.EMAIL_USER);
-console.log("EMAIL_PASS:", process.env.EMAIL_PASS ? "Loaded ✅" : "Missing ❌");
+// Removed sensitive console logs for security
 
 connectDB();
 
 const app = express();
 
 
-app.use(cors());
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
 
 app.use(express.json());
 
@@ -41,6 +51,9 @@ app.use("/api/dashboard", dashboardRoutes);
 
 app.use("/api/otp", otpRoutes);
 
+app.use("/api/upload", uploadRoutes);
+
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.get("/", (req, res) => {
     res.send("HRMS Backend Running");
