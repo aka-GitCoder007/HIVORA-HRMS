@@ -4,12 +4,12 @@ import {
   sendOTP,
   verifyOTP,
 } from "../controllers/otpController.js";
-import { authLimiter } from "../middleware/rateLimiter.js";
+
 
 const router = express.Router();
 
-router.post("/send", authLimiter, sendOTP);
+router.post("/send", sendOTP);
 
-router.post("/verify", authLimiter, verifyOTP);
+router.post("/verify", verifyOTP);
 
 export default router;

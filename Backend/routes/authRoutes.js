@@ -8,15 +8,15 @@ import {
 } from "../controllers/authController.js";
 
 import { protect } from "../middleware/authMiddleware.js";
-import { authLimiter } from "../middleware/rateLimiter.js";
+
 import { signupValidation, loginValidation, validate } from "../middleware/validator.js";
 
 const router = express.Router();
 
 // Public Routes
-router.post("/signup", authLimiter, signupValidation, validate, signup);
-router.post("/login", authLimiter, loginValidation, validate, login);
-router.post("/forgot-password", authLimiter, forgotPassword);
+router.post("/signup", signupValidation, validate, signup);
+router.post("/login", loginValidation, validate, login);
+router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
 
 // Protected Route
