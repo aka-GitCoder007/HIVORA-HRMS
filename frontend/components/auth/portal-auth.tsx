@@ -169,6 +169,13 @@ export function PortalAuth({
         } else {
           setBanner({ type: "error", msg: response.message || "Invalid credentials. Please try again." })
           setShakeKey((k) => k + 1)
+          if (response.message === "Please verify your email before logging in.") {
+            setTimeout(() => {
+              if (typeof window !== 'undefined') {
+                router.push(`/verify-otp?email=${encodeURIComponent(email.trim().toLowerCase())}`)
+              }
+            }, 2000)
+          }
         }
       }
     } catch (error: any) {

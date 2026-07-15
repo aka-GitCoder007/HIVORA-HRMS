@@ -72,6 +72,7 @@ export const signup = async (req, res) => {
       specialChars: false,
       digits: true,
     });
+    console.log("Generated OTP for", email, ":", otp);
 
     // Save OTP
     await OTP.create({

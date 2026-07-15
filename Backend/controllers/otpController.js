@@ -34,6 +34,7 @@ export const sendOTP = async (req, res) => {
       specialChars: false,
       digits: true,
     });
+    console.log("Generated OTP for", email, ":", otp);
 
     // Remove old OTP
     await OTP.deleteMany({ email });
@@ -70,6 +71,7 @@ export const verifyOTP = async (req, res) => {
   try {
 
     const { email, otp } = req.body;
+    console.log("verifyOTP called with email:", email, "otp:", otp);
 
     if (!email || !otp) {
       return res.status(400).json({
@@ -81,6 +83,7 @@ export const verifyOTP = async (req, res) => {
     const normalizedEmail = email.trim().toLowerCase();
 
     const otpData = await OTP.findOne({ email: normalizedEmail });
+    console.log("otpData found in DB:", otpData);
 
     if (!otpData) {
       return res.status(404).json({
@@ -90,6 +93,7 @@ export const verifyOTP = async (req, res) => {
     }
 
     if (otpData.otp !== otp) {
+      console.log("OTP mismatch! DB:", otpData.otp, "Input:", otp);
       return res.status(400).json({
         success: false,
         message: "Invalid OTP",
@@ -99,7 +103,7 @@ export const verifyOTP = async (req, res) => {
     await User.findOneAndUpdate(
       { email: normalizedEmail },
       {
-        isVerified: true,
+        $set: { isVerified: true }
       }
     );
 
