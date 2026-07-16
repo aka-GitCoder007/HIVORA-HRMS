@@ -74,12 +74,11 @@ export const signup = async (req, res) => {
     // Save OTP with normalized email
     await OTP.create({ email, otp });
 
-    // Send Email — decouple from user creation so email failure doesn't block signup
-    try {
-      await sendEmail(
-        email,
-        "Verify Your Email - HIVORA HRMS",
-        `Hello ${name.trim()},
+    // Fire email asynchronously — respond immediately, email delivers in background
+    sendEmail(
+      email,
+      "Verify Your Email - HIVORA HRMS",
+      `Hello ${name.trim()},
 
 Your OTP for verifying your HIVORA HRMS account is:
 
@@ -91,14 +90,13 @@ If you did not sign up, please ignore this email.
 
 Thank you,
 HIVORA HRMS Team`
+    )
+      .then(() => console.log("✅ Signup OTP email sent to:", email))
+      .catch((emailError) =>
+        console.error("❌ Failed to send signup OTP email to:", email, emailError.message)
       );
-      console.log("✅ Signup OTP email sent to:", email);
-    } catch (emailError) {
-      console.error("❌ Failed to send signup OTP email to:", email, emailError.message);
-      // Don't fail the whole signup — user is saved, OTP is saved
-      // They can use "Resend OTP" on the verify page
-    }
 
+    // Respond immediately — don't wait for email delivery
     return res.status(201).json({
       success: true,
       message: "Registration successful. OTP sent to your email.",

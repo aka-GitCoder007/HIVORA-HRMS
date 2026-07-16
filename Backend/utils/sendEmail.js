@@ -1,38 +1,65 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
-const sendEmail = async (email, subject, text) => {
-  // Validate env vars early and log clearly on Render
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.error("❌ EMAIL_USER or EMAIL_PASS is not set in environment variables.");
-    throw new Error("Email service not configured. Please set EMAIL_USER and EMAIL_PASS.");
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+/**
+ * Sends a transactional email via Resend API.
+ *
+ * @param {string} to      - Recipient email address
+ * @param {string} subject - Email subject line
+ * @param {string} text    - Plain-text email body
+ * @returns {Promise<object>} - Resend API response
+ */
+const sendEmail = async (to, subject, text) => {
+  if (!process.env.RESEND_API_KEY) {
+    console.error("❌ RESEND_API_KEY is not set in environment variables.");
+    throw new Error("Email service not configured. Please set RESEND_API_KEY.");
   }
 
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
+  const fromAddress = process.env.FROM_EMAIL || "onboarding@resend.dev";
 
-  // Verify connection before sending
-  try {
-    await transporter.verify();
-  } catch (verifyError) {
-    console.error("❌ Email transporter verification failed:", verifyError.message);
-    throw new Error("Email service authentication failed. Check EMAIL_USER and EMAIL_PASS.");
-  }
+  const attemptSend = async () => {
+    // Race between actual send and a 10-second timeout guard
+    const sendPromise = resend.emails.send({
+      from: `HIVORA HRMS <${fromAddress}>`,
+      to,
+      subject,
+      text,
+    });
 
-  const mailOptions = {
-    from: `"HIVORA HRMS" <${process.env.EMAIL_USER}>`,
-    to: email,
-    subject,
-    text,
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Email send timed out after 10 seconds")), 10_000)
+    );
+
+    return Promise.race([sendPromise, timeoutPromise]);
   };
 
-  const info = await transporter.sendMail(mailOptions);
-  console.log("✅ Email sent to:", email, "| MessageId:", info.messageId);
-  return info;
+  // 1 retry on failure
+  let lastError;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const response = await attemptSend();
+
+      if (response.error) {
+        throw new Error(`Resend API error: ${response.error.message}`);
+      }
+
+      console.log(
+        `✅ Email sent to: ${to} | Subject: "${subject}" | ID: ${response.data?.id} | Attempt: ${attempt}`
+      );
+      return response;
+    } catch (err) {
+      lastError = err;
+      console.warn(`⚠️ Email attempt ${attempt} failed for ${to}: ${err.message}`);
+      if (attempt < 2) {
+        // Wait 1s before retry
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    }
+  }
+
+  console.error(`❌ All email attempts failed for ${to}:`, lastError.message);
+  throw lastError;
 };
 
 export default sendEmail;
