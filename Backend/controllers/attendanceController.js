@@ -103,6 +103,31 @@ export const myAttendance = async (req, res) => {
 };
 
 // ==============================
+// Today's Attendance (for logged-in employee)
+// ==============================
+export const todayAttendance = async (req, res) => {
+  try {
+    const today = new Date().toLocaleDateString("en-CA");
+
+    const record = await Attendance.findOne({
+      employee: req.user._id,
+      date: today,
+    });
+
+    res.status(200).json({
+      success: true,
+      attendance: record || null,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: "Server Error",
+    });
+  }
+};
+
+// ==============================
 // HR View All Attendance
 // ==============================
 export const allAttendance = async (req, res) => {

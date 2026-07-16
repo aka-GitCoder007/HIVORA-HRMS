@@ -268,6 +268,12 @@ export async function checkOutAttendance() {
   return data
 }
 
+export async function fetchTodayAttendance(): Promise<AttendanceRecord | null> {
+  const { data } = await apiClient.get('/attendance/today')
+  if (!data.attendance) return null
+  return normalizeAttendanceRecord(data.attendance)
+}
+
 export async function fetchMyLeaves() {
   const { data } = await apiClient.get('/leave/my-leaves')
   return (data.leaves || []).map(normalizeLeaveRequest)

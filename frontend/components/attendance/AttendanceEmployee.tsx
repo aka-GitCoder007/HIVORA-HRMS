@@ -4,66 +4,66 @@ import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Clock, Calendar } from 'lucide-react'
 import { StatusBadge } from '../StatusBadge'
-import { checkInAttendance, checkOutAttendance, fetchMyAttendance } from '@/lib/api'
+import {
+  checkInAttendance,
+  checkOutAttendance,
+  fetchMyAttendance,
+  fetchTodayAttendance,
+  type AttendanceRecord,
+} from '@/lib/api'
 import { useAuth } from '@/lib/authContext'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 
-interface AttendanceEmployeeProps {
-  employeeId?: string
-}
-
-export function AttendanceEmployee({ employeeId = '' }: AttendanceEmployeeProps) {
+export function AttendanceEmployee() {
   const { user } = useAuth()
-  const [isCheckedIn, setIsCheckedIn] = useState(false)
-  const [hasTodayRecord, setHasTodayRecord] = useState(false)
+
+  // Today's record (null = not checked in yet)
+  const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null)
+
+  // Full history for the weekly table
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
+
   const [view, setView] = useState<'daily' | 'weekly'>('daily')
-  const [checkedInTime, setCheckedInTime] = useState<string | null>(null)
-  const [checkedOutTime, setCheckedOutTime] = useState<string | null>(null)
-  const [attendance, setAttendance] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(true)
 
-  const currentEmployee = user
+  // ─── Derived button states ─────────────────────────────────────────────────
+  // Check In:  enabled only when there is NO record for today
+  const canCheckIn = todayRecord === null
 
-  const processRecords = (records: any[]) => {
-    setAttendance(records)
-    const todayStr = new Date().toLocaleDateString('en-CA')
-    const todayRecord = records.find((r: any) => r.date === todayStr)
-    if (todayRecord) {
-      setCheckedInTime(todayRecord.checkInTime || null)
-      setCheckedOutTime(todayRecord.checkOutTime || null)
-      setIsCheckedIn(Boolean(todayRecord.checkInTime && !todayRecord.checkOutTime))
-      setHasTodayRecord(true)
-    } else {
-      setCheckedInTime(null)
-      setCheckedOutTime(null)
-      setIsCheckedIn(false)
-      setHasTodayRecord(false)
+  // Check Out: enabled only when checked in AND not yet checked out
+  const canCheckOut =
+    todayRecord !== null &&
+    Boolean(todayRecord.checkInTime) &&
+    !todayRecord.checkOutTime
+
+  // ─── Load data ─────────────────────────────────────────────────────────────
+  const loadAll = async () => {
+    try {
+      const [today, history] = await Promise.all([
+        fetchTodayAttendance(),
+        fetchMyAttendance(),
+      ])
+      setTodayRecord(today)
+      setAttendance(history)
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to load attendance records')
+    } finally {
+      setIsLoadingData(false)
     }
   }
 
   useEffect(() => {
-    const loadAttendance = async () => {
-      try {
-        const records = await fetchMyAttendance()
-        processRecords(records)
-      } catch (error: any) {
-        toast.error(error?.response?.data?.message || 'Failed to load attendance records')
-      } finally {
-        setIsLoadingData(false)
-      }
-    }
-
-    void loadAttendance()
+    void loadAll()
   }, [])
 
+  // ─── Handlers ──────────────────────────────────────────────────────────────
   const handleCheckIn = async () => {
     setLoading(true)
     try {
       await checkInAttendance()
-      const records = await fetchMyAttendance()
-      processRecords(records)
+      await loadAll()
       toast.success('Successfully checked in for today!')
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Unable to check in. Please try again.')
@@ -76,8 +76,7 @@ export function AttendanceEmployee({ employeeId = '' }: AttendanceEmployeeProps)
     setLoading(true)
     try {
       await checkOutAttendance()
-      const records = await fetchMyAttendance()
-      processRecords(records)
+      await loadAll()
       toast.success('Successfully checked out. Have a great evening!')
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Unable to check out. Please try again.')
@@ -86,9 +85,7 @@ export function AttendanceEmployee({ employeeId = '' }: AttendanceEmployeeProps)
     }
   }
 
-  const todayStr = new Date().toLocaleDateString('en-CA')
-  const todayRecord = attendance.find((r: any) => r.date === todayStr)
-
+  // ─── Loading state ─────────────────────────────────────────────────────────
   if (isLoadingData) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -101,49 +98,63 @@ export function AttendanceEmployee({ employeeId = '' }: AttendanceEmployeeProps)
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Check-in / Check-out Card */}
       <div className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 border border-blue-200 dark:border-blue-800 rounded-xl p-8">
-        <h1 className="text-2xl font-bold mb-2">Welcome, {currentEmployee?.name}</h1>
+        <h1 className="text-2xl font-bold mb-2">Welcome, {user?.name}</h1>
         <p className="text-foreground/70 mb-6">Today&apos;s Attendance</p>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          {/* Status */}
           <div className="bg-white/50 dark:bg-black/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800/50">
             <p className="text-sm text-foreground/70 mb-1">Status</p>
             {todayRecord ? (
               <StatusBadge status={todayRecord.status} />
             ) : (
-              <p className="text-foreground font-semibold">Not Marked</p>
+              <p className="text-foreground font-semibold">Not Checked In</p>
             )}
           </div>
 
+          {/* Check In time */}
           <div className="bg-white/50 dark:bg-black/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800/50">
             <p className="text-sm text-foreground/70 mb-1">Check In</p>
-            <p className="text-lg font-semibold text-green-600">{checkedInTime || todayRecord?.checkInTime || 'Not checked in'}</p>
+            <p className="text-lg font-semibold text-green-600">
+              {todayRecord?.checkInTime || 'Not checked in'}
+            </p>
           </div>
 
+          {/* Check Out time */}
           <div className="bg-white/50 dark:bg-black/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800/50">
             <p className="text-sm text-foreground/70 mb-1">Check Out</p>
-            <p className="text-lg font-semibold text-red-600">{checkedOutTime || todayRecord?.checkOutTime || 'Not checked out'}</p>
+            <p className="text-lg font-semibold text-red-600">
+              {todayRecord?.checkOutTime || 'Not checked out'}
+            </p>
           </div>
         </div>
 
-        <div className="flex flex-col gap-3">
-          <div className="flex gap-3">
-            <Button
-              onClick={handleCheckIn}
-              disabled={hasTodayRecord || loading}
-              className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
-            >
+        <div className="flex gap-3">
+          <Button
+            onClick={handleCheckIn}
+            disabled={!canCheckIn || loading}
+            className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
+          >
+            {loading && canCheckIn ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
               <Clock className="w-4 h-4 mr-2" />
-              Check In
-            </Button>
-            <Button
-              onClick={handleCheckOut}
-              disabled={!isCheckedIn || loading}
-              variant="outline"
-            >
+            )}
+            Check In
+          </Button>
+
+          <Button
+            onClick={handleCheckOut}
+            disabled={!canCheckOut || loading}
+            variant="outline"
+          >
+            {loading && canCheckOut ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
               <Clock className="w-4 h-4 mr-2" />
-              Check Out
-            </Button>
-          </div>
+            )}
+            Check Out
+          </Button>
         </div>
       </div>
 
@@ -190,16 +201,20 @@ export function AttendanceEmployee({ employeeId = '' }: AttendanceEmployeeProps)
                 </div>
                 <div>
                   <label className="text-sm text-foreground/70">Check-in Time</label>
-                  <p className="text-foreground font-semibold mt-2">{todayRecord.checkInTime || 'N/A'}</p>
+                  <p className="text-foreground font-semibold mt-2">
+                    {todayRecord.checkInTime || 'N/A'}
+                  </p>
                 </div>
               </div>
               <div>
                 <label className="text-sm text-foreground/70">Check-out Time</label>
-                <p className="text-foreground font-semibold mt-2">{todayRecord.checkOutTime || 'N/A'}</p>
+                <p className="text-foreground font-semibold mt-2">
+                  {todayRecord.checkOutTime || 'Not yet checked out'}
+                </p>
               </div>
             </div>
           ) : (
-            <p className="text-foreground/70">No attendance record for today.</p>
+            <p className="text-foreground/70">No attendance record for today. Click Check In to mark your attendance.</p>
           )}
         </div>
       )}
@@ -232,7 +247,7 @@ export function AttendanceEmployee({ employeeId = '' }: AttendanceEmployeeProps)
                   </td>
                 </tr>
               ) : (
-                attendance.slice(0, 7).map((record: any, idx: number) => (
+                attendance.slice(0, 7).map((record, idx) => (
                   <tr key={idx} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
                     <td className="py-3 px-4 text-foreground">{record.date}</td>
                     <td className="py-3 px-4 text-foreground">{record.checkInTime || '-'}</td>
