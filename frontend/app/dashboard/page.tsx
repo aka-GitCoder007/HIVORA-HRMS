@@ -35,7 +35,7 @@ export default function Dashboard() {
         return <ProfileView isAdmin={user.role === 'admin'} />
       case 'Attendance':
         return user.role === 'employee' ? (
-          <AttendanceEmployee employeeId={user.id} />
+          <AttendanceEmployee />
         ) : (
           <AttendanceAdmin />
         )
