@@ -5,7 +5,7 @@ import Attendance from "../models/Attendance.js";
 // ==============================
 export const checkIn = async (req, res) => {
   try {
-    const today = new Date().toLocaleDateString('en-CA');
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
     const existing = await Attendance.findOne({
       employee: req.user._id,
@@ -22,7 +22,7 @@ export const checkIn = async (req, res) => {
     const attendance = await Attendance.create({
       employee: req.user._id,
       date: today,
-      checkIn: new Date().toLocaleTimeString(),
+      checkIn: new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata' }),
       status: "Present",
     });
 
@@ -46,7 +46,7 @@ export const checkIn = async (req, res) => {
 // ==============================
 export const checkOut = async (req, res) => {
   try {
-    const today = new Date().toLocaleDateString('en-CA');
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
     const attendance = await Attendance.findOne({
       employee: req.user._id,
@@ -60,7 +60,7 @@ export const checkOut = async (req, res) => {
       });
     }
 
-    attendance.checkOut = new Date().toLocaleTimeString();
+    attendance.checkOut = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata' });
 
     await attendance.save();
 
@@ -107,7 +107,7 @@ export const myAttendance = async (req, res) => {
 // ==============================
 export const todayAttendance = async (req, res) => {
   try {
-    const today = new Date().toLocaleDateString("en-CA");
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 
     const record = await Attendance.findOne({
       employee: req.user._id,
