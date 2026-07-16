@@ -26,23 +26,40 @@ connectDB();
 const app = express();
 
 
-const allowedOrigins = [
-  "http://localhost:3000",
-  "http://localhost:3001",
-  ...(process.env.FRONTEND_URL
-    ? [process.env.FRONTEND_URL.replace(/\/$/, "")]
-    : []),
-];
+const getAllowedOrigins = () => {
+  const origins = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+  ];
+
+  // Support comma-separated FRONTEND_URLS (e.g., https://domain1.com,https://domain2.com)
+  if (process.env.FRONTEND_URLS) {
+    const envUrls = process.env.FRONTEND_URLS.split(",").map(url => url.trim().replace(/\/$/, ""));
+    origins.push(...envUrls);
+  } else if (process.env.FRONTEND_URL) {
+    // Fallback for older .env files
+    origins.push(process.env.FRONTEND_URL.trim().replace(/\/$/, ""));
+  }
+
+  return [...new Set(origins)]; // Remove duplicates
+};
+
+const allowedOrigins = getAllowedOrigins();
 
 app.use(
   cors({
     origin: (origin, callback) => {
       // Allow requests with no origin (mobile apps, Postman, curl)
       if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin.replace(/\/$/, ""))) {
+
+      const normalizedOrigin = origin.replace(/\/$/, "");
+      
+      if (allowedOrigins.includes(normalizedOrigin)) {
         return callback(null, true);
       }
-      console.warn("CORS blocked origin:", origin);
+      
+      console.error(`❌ CORS blocked request from origin: ${origin}`);
+      console.error(`   Allowed origins are: ${allowedOrigins.join(', ')}`);
       return callback(new Error(`CORS: Origin ${origin} not allowed`), false);
     },
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],

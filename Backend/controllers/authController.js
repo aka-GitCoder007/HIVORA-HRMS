@@ -242,7 +242,14 @@ export const forgotPassword = async (req, res) => {
     user.resetPasswordExpires = Date.now() + 60 * 60 * 1000; // 1 hour
     await user.save();
 
-    const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/$/, "");
+    const getPrimaryFrontendUrl = () => {
+      if (process.env.FRONTEND_URLS) {
+        return process.env.FRONTEND_URLS.split(',')[0].trim().replace(/\/$/, "");
+      }
+      return (process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/$/, "");
+    };
+
+    const frontendUrl = getPrimaryFrontendUrl();
     const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
 
     try {
