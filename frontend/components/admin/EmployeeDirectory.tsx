@@ -376,7 +376,7 @@ export function EmployeeDirectory() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: 'Total Employees', value: stats.total, icon: Users, color: 'text-cyan-400', bg: 'bg-cyan-500/10 border-cyan-500/20' },
           { label: 'Departments', value: stats.departments, icon: Building2, color: 'text-purple-400', bg: 'bg-purple-500/10 border-purple-500/20' },
