@@ -12,10 +12,10 @@ import sendEmail from "../utils/sendEmail.js";
 // =========================
 export const signup = async (req, res) => {
   try {
-    let { employeeId, name, email, password, role } = req.body;
+    let { name, email, password, role } = req.body;
 
     // Required fields validation
-    if (!employeeId || !name || !email || !password || !role) {
+    if (!name || !email || !password || !role) {
       return res.status(400).json({
         success: false,
         message: "All fields are required",
@@ -36,29 +36,60 @@ export const signup = async (req, res) => {
     }
 
     // Existing User Check
-    const existingUser = await User.findOne({
-      $or: [{ email }, { employeeId: employeeId.trim() }],
-    });
+    const existingUser = await User.findOne({ email });
 
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: "Employee ID or Email already exists",
+        message: "Email already exists",
       });
     }
 
     // Hash Password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create User
-    const user = await User.create({
-      employeeId: employeeId.trim(),
-      name: name.trim(),
-      email,
-      password: hashedPassword,
-      role,
-      isVerified: false,
-    });
+    // Auto-generate employeeId with retry logic
+    let user = null;
+    let attempts = 0;
+    while (!user && attempts < 3) {
+      try {
+        const highestUser = await User.findOne({ employeeId: { $regex: /^EMP-\d+$/i } })
+          .collation({ locale: "en_US", numericOrdering: true })
+          .sort({ employeeId: -1 });
+
+        let newEmployeeId = "EMP-001";
+        if (highestUser && highestUser.employeeId) {
+          const match = highestUser.employeeId.match(/EMP-(\d+)/i);
+          if (match) {
+            const nextIdNum = parseInt(match[1], 10) + 1;
+            newEmployeeId = `EMP-${nextIdNum.toString().padStart(3, '0')}`;
+          }
+        }
+
+        // Create User
+        user = await User.create({
+          employeeId: newEmployeeId,
+          name: name.trim(),
+          email,
+          password: hashedPassword,
+          role,
+          isVerified: false,
+        });
+      } catch (err) {
+        if (err.code === 11000 && err.keyPattern && err.keyPattern.employeeId) {
+          attempts++;
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    if (!user) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to generate a unique employee ID. Please try again.",
+      });
+    }
 
     // Delete previous OTP if exists
     await OTP.deleteMany({ email });

@@ -58,7 +58,6 @@ export function PortalAuth({
   const [errors, setErrors] = useState<Errors>({})
 
   // shared field state
-  const [employeeId, setEmployeeId] = useState("")
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -96,7 +95,6 @@ export function PortalAuth({
     if (!password) e.password = "Password is required"
 
     if (mode === "signup") {
-      if (!employeeId.trim()) e.employeeId = "Employee ID is required"
       if (!fullName.trim()) e.fullName = "Full name is required"
       if (password && getPasswordStrength(password).score < 2)
         e.password = "Choose a stronger password"
@@ -120,7 +118,6 @@ export function PortalAuth({
     try {
       if (mode === "signup") {
         const response = await signupUser({
-          employeeId,
           name: fullName,
           email: email.trim().toLowerCase(),
           password,
@@ -277,17 +274,6 @@ export function PortalAuth({
         >
           {mode === "signup" && (
             <>
-              <Field
-                id="employeeId"
-                label="Employee ID"
-                value={employeeId}
-                onChange={setEmployeeId}
-                icon={User}
-                placeholder="EMP-00123"
-                error={errors.employeeId}
-                ringClass={theme.ring}
-                required
-              />
               <Field
                 id="fullName"
                 label="Full Name"

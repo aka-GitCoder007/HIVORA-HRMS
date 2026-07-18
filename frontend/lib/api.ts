@@ -207,7 +207,7 @@ export async function loginUser(payload: { email: string; password: string; port
   return data
 }
 
-export async function signupUser(payload: { employeeId: string; name: string; email: string; password: string; role: 'Employee' | 'HR' }) {
+export async function signupUser(payload: { name: string; email: string; password: string; role: 'Employee' | 'HR' }) {
   const { data } = await apiClient.post('/auth/signup', payload)
   return data
 }

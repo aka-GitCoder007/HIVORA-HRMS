@@ -1,6 +1,6 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resend;
 
 /**
  * Sends a transactional email via Resend API.
@@ -14,6 +14,10 @@ const sendEmail = async (to, subject, text) => {
   if (!process.env.RESEND_API_KEY) {
     console.error("❌ RESEND_API_KEY is not set in environment variables.");
     throw new Error("Email service not configured. Please set RESEND_API_KEY.");
+  }
+
+  if (!resend) {
+    resend = new Resend(process.env.RESEND_API_KEY);
   }
 
   const fromAddress = process.env.FROM_EMAIL || "onboarding@resend.dev";
