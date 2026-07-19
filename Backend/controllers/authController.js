@@ -12,7 +12,13 @@ import sendEmail from "../utils/sendEmail.js";
 // =========================
 export const signup = async (req, res) => {
   try {
-    let { name, email, password, role } = req.body;
+    let {
+      name, email, password, role,
+      phone, address, dob, gender,
+      emergencyContact, emergencyPhone,
+      department, designation, joiningDate, reportingManager,
+      profilePicture
+    } = req.body;
 
     // Required fields validation
     if (!name || !email || !password || !role) {
@@ -74,6 +80,17 @@ export const signup = async (req, res) => {
           password: hashedPassword,
           role,
           isVerified: false,
+          phone: phone?.trim(),
+          address: address?.trim(),
+          dob: dob?.trim(),
+          gender: gender?.trim(),
+          emergencyContact: emergencyContact?.trim(),
+          emergencyPhone: emergencyPhone?.trim(),
+          department: department?.trim(),
+          designation: designation?.trim(),
+          joiningDate: joiningDate?.trim(),
+          reportingManager: reportingManager?.trim(),
+          profilePicture: profilePicture?.trim() || ""
         });
       } catch (err) {
         if (err.code === 11000 && err.keyPattern && err.keyPattern.employeeId) {

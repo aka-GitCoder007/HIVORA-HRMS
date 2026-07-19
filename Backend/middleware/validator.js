@@ -16,6 +16,12 @@ export const signupValidation = [
   body("email").trim().isEmail().withMessage("Valid email is required"),
   body("password").isLength({ min: 8 }).withMessage("Password must be at least 8 characters"),
   body("role").trim().escape().notEmpty().withMessage("Role is required"),
+  body("phone").trim().escape().notEmpty().withMessage("Phone is required"),
+  body("address").trim().escape().notEmpty().withMessage("Address is required"),
+  body("dob").trim().escape().notEmpty().withMessage("Date of Birth is required"),
+  body("gender").trim().escape().notEmpty().withMessage("Gender is required"),
+  body("emergencyContact").trim().escape().notEmpty().withMessage("Emergency Contact Name is required"),
+  body("emergencyPhone").trim().escape().notEmpty().withMessage("Emergency Contact Phone is required"),
 ];
 
 export const loginValidation = [

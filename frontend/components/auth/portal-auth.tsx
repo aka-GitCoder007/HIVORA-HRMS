@@ -11,12 +11,21 @@ import {
   Lock,
   Mail,
   User,
+  Calendar,
+  MapPin,
+  Building2,
+  Briefcase,
+  BriefcaseBusiness,
+  Phone,
+  ShieldAlert,
+  Image as ImageIcon,
+  Camera
 } from "lucide-react"
 import { useAuth } from "@/lib/authContext"
 import { Field } from "./field"
 import { PasswordField, getPasswordStrength } from "./password-field"
 import { cn } from "@/lib/utils"
-import { loginUser, normalizeUser, signupUser, verifyOtp } from "@/lib/api"
+import { loginUser, normalizeUser, signupUser } from "@/lib/api"
 
 export type PortalTheme = {
   variant: "employee" | "admin"
@@ -42,6 +51,13 @@ type Mode = "signin" | "signup"
 
 type Errors = Record<string, string>
 
+const SectionHeader = ({ icon: Icon, title }: { icon: LucideIcon; title: string }) => (
+  <div className="col-span-full flex items-center gap-2 mt-4 mb-1">
+    <Icon className="size-4 text-muted-foreground" />
+    <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{title}</h3>
+  </div>
+)
+
 export function PortalAuth({
   theme,
   onBack,
@@ -57,12 +73,29 @@ export function PortalAuth({
   const [shakeKey, setShakeKey] = useState(0)
   const [errors, setErrors] = useState<Errors>({})
 
-  // shared field state
-  const [fullName, setFullName] = useState("")
+  // credentials state
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirm, setConfirm] = useState("")
   const [remember, setRemember] = useState(false)
+
+  // personal info state
+  const [fullName, setFullName] = useState("")
+  const [phone, setPhone] = useState("")
+  const [address, setAddress] = useState("")
+  const [dob, setDob] = useState("")
+  const [gender, setGender] = useState("")
+  const [profilePicture, setProfilePicture] = useState("")
+  
+  // work info state (optional)
+  const [department, setDepartment] = useState("")
+  const [designation, setDesignation] = useState("")
+  const [joiningDate, setJoiningDate] = useState("")
+  const [reportingManager, setReportingManager] = useState("")
+  
+  // emergency contact state
+  const [emergencyContact, setEmergencyContact] = useState("")
+  const [emergencyPhone, setEmergencyPhone] = useState("")
 
   const Icon = theme.icon
 
@@ -95,12 +128,31 @@ export function PortalAuth({
     if (!password) e.password = "Password is required"
 
     if (mode === "signup") {
-      if (!fullName.trim()) e.fullName = "Full name is required"
       if (password && getPasswordStrength(password).score < 2)
         e.password = "Choose a stronger password"
       if (confirm !== password) e.confirm = "Passwords do not match"
+      
+      if (!fullName.trim()) e.fullName = "Full name is required"
+      if (!dob) e.dob = "Date of birth is required"
+      if (!gender) e.gender = "Gender is required"
+      if (!phone.trim()) e.phone = "Phone is required"
+      if (!address.trim()) e.address = "Address is required"
+      
+      if (!emergencyContact.trim()) e.emergencyContact = "Emergency contact name is required"
+      if (!emergencyPhone.trim()) e.emergencyPhone = "Emergency contact phone is required"
     }
     return e
+  }
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setProfilePicture(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
   }
 
   async function handleSubmit(event: React.FormEvent) {
@@ -122,6 +174,17 @@ export function PortalAuth({
           email: email.trim().toLowerCase(),
           password,
           role: theme.variant === "admin" ? "HR" : "Employee",
+          phone,
+          address,
+          dob,
+          gender,
+          emergencyContact,
+          emergencyPhone,
+          department,
+          designation,
+          joiningDate,
+          reportingManager,
+          profilePicture
         })
 
         if (response.success) {
@@ -184,7 +247,7 @@ export function PortalAuth({
   }
 
   return (
-    <div className="animate-slide-up w-full max-w-md">
+    <div className={cn("animate-slide-up w-full mx-auto", mode === "signup" ? "max-w-2xl" : "max-w-md")}>
       {/* header badge */}
       <div
         className={cn(
@@ -270,56 +333,46 @@ export function PortalAuth({
           key={`${mode}-${shakeKey}`}
           onSubmit={handleSubmit}
           noValidate
-          className={cn("flex flex-col gap-4", errors && shakeKey > 0 && "animate-shake")}
-        >
-          {mode === "signup" && (
-            <>
-              <Field
-                id="fullName"
-                label="Full Name"
-                value={fullName}
-                onChange={setFullName}
-                icon={User}
-                placeholder="Jane Doe"
-                error={errors.fullName}
-                ringClass={theme.ring}
-                required
-              />
-            </>
+          className={cn(
+            mode === "signup" ? "grid grid-cols-1 md:grid-cols-2 gap-4" : "flex flex-col gap-4",
+            errors && shakeKey > 0 && "animate-shake"
           )}
+        >
+          {/* CREDENTIALS SECTION */}
+          {mode === "signup" && <SectionHeader icon={Lock} title="Credentials" />}
+          
+          <div className={cn("col-span-full", mode === "signup" && "grid grid-cols-1 md:grid-cols-2 gap-4")}>
+            <Field
+              id="email"
+              label="Email"
+              type="email"
+              value={email}
+              onChange={setEmail}
+              icon={Mail}
+              placeholder="you@company.com"
+              error={errors.email}
+              helper={mode === "signup" ? "A verification link will be sent to this email" : undefined}
+              autoComplete="email"
+              ringClass={theme.ring}
+              required
+            />
 
-          <Field
-            id="email"
-            label="Email"
-            type="email"
-            value={email}
-            onChange={setEmail}
-            icon={Mail}
-            placeholder="you@company.com"
-            error={errors.email}
-            helper={
-              mode === "signup" ? "A verification link will be sent to this email" : undefined
-            }
-            autoComplete="email"
-            ringClass={theme.ring}
-            required
-          />
-
-          <PasswordField
-            id="password"
-            label="Password"
-            value={password}
-            onChange={setPassword}
-            error={errors.password}
-            autoComplete={mode === "signup" ? "new-password" : "current-password"}
-            ringClass={theme.ring}
-            barClass={theme.strengthBar}
-            showStrength={mode === "signup"}
-            required
-          />
+            <PasswordField
+              id="password"
+              label="Password"
+              value={password}
+              onChange={setPassword}
+              error={errors.password}
+              autoComplete={mode === "signup" ? "new-password" : "current-password"}
+              ringClass={theme.ring}
+              barClass={theme.strengthBar}
+              showStrength={mode === "signup"}
+              required
+            />
+          </div>
 
           {mode === "signup" && (
-            <>
+            <div className="col-span-full grid grid-cols-1 md:grid-cols-2 gap-4">
               <PasswordField
                 id="confirm"
                 label="Confirm Password"
@@ -331,12 +384,12 @@ export function PortalAuth({
                 barClass={theme.strengthBar}
                 required
               />
-              {/* locked role badge */}
+              
               <div className="flex flex-col gap-1.5">
                 <span className="text-sm font-medium text-foreground">Role</span>
                 <div
                   aria-disabled="true"
-                  className="flex items-center justify-between rounded-lg border border-dashed border-input bg-muted/60 px-3 py-2.5"
+                  className="flex items-center justify-between h-[42px] rounded-lg border border-dashed border-input bg-muted/60 px-3 py-2.5"
                 >
                   <span className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Lock className="size-3.5" aria-hidden="true" />
@@ -353,11 +406,173 @@ export function PortalAuth({
                   </span>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* EXTENDED SIGNUP FIELDS */}
+          {mode === "signup" && (
+            <>
+              <SectionHeader icon={User} title="Personal Information" />
+              
+              <div className="col-span-full flex flex-col items-center gap-3 mb-2">
+                <div className="relative group">
+                  <div className="w-24 h-24 rounded-full border-2 border-dashed border-input bg-muted/30 overflow-hidden flex items-center justify-center relative">
+                    {profilePicture ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={profilePicture} alt="Profile preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <ImageIcon className="w-8 h-8 text-muted-foreground/50" />
+                    )}
+                    <label className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                      <Camera className="w-6 h-6 text-white" />
+                      <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+                    </label>
+                  </div>
+                </div>
+                <span className="text-xs text-muted-foreground">Upload Photo (Optional)</span>
+              </div>
+
+              <div className="col-span-full">
+                <Field
+                  id="fullName"
+                  label="Full Name"
+                  value={fullName}
+                  onChange={setFullName}
+                  icon={User}
+                  placeholder="Jane Doe"
+                  error={errors.fullName}
+                  ringClass={theme.ring}
+                  required
+                />
+              </div>
+
+              <Field
+                id="dob"
+                label="Date of Birth"
+                type="date"
+                value={dob}
+                onChange={setDob}
+                icon={Calendar}
+                error={errors.dob}
+                ringClass={theme.ring}
+                required
+              />
+
+              <Field
+                id="gender"
+                label="Gender"
+                value={gender}
+                onChange={setGender}
+                icon={User}
+                error={errors.gender}
+                ringClass={theme.ring}
+                required
+                options={[
+                  { label: "Male", value: "Male" },
+                  { label: "Female", value: "Female" },
+                  { label: "Other", value: "Other" },
+                  { label: "Prefer not to say", value: "Prefer not to say" }
+                ]}
+              />
+
+              <Field
+                id="phone"
+                label="Phone"
+                type="tel"
+                value={phone}
+                onChange={setPhone}
+                icon={Phone}
+                placeholder="123-456-7890"
+                error={errors.phone}
+                ringClass={theme.ring}
+                required
+              />
+
+              <Field
+                id="address"
+                label="Address"
+                value={address}
+                onChange={setAddress}
+                icon={MapPin}
+                placeholder="123 Main St"
+                error={errors.address}
+                ringClass={theme.ring}
+                required
+              />
+
+              <SectionHeader icon={BriefcaseBusiness} title="Work Information (Optional)" />
+              
+              <Field
+                id="department"
+                label="Department"
+                value={department}
+                onChange={setDepartment}
+                icon={Building2}
+                placeholder="Engineering"
+                ringClass={theme.ring}
+              />
+              
+              <Field
+                id="designation"
+                label="Designation"
+                value={designation}
+                onChange={setDesignation}
+                icon={Briefcase}
+                placeholder="Software Engineer"
+                ringClass={theme.ring}
+              />
+              
+              <Field
+                id="joiningDate"
+                label="Joining Date"
+                type="date"
+                value={joiningDate}
+                onChange={setJoiningDate}
+                icon={Calendar}
+                ringClass={theme.ring}
+              />
+              
+              <Field
+                id="reportingManager"
+                label="Reporting Manager"
+                value={reportingManager}
+                onChange={setReportingManager}
+                icon={User}
+                placeholder="John Doe"
+                ringClass={theme.ring}
+              />
+
+              <SectionHeader icon={ShieldAlert} title="Emergency Contact" />
+              
+              <Field
+                id="emergencyContact"
+                label="Contact Name"
+                value={emergencyContact}
+                onChange={setEmergencyContact}
+                icon={User}
+                placeholder="Emergency Contact Name"
+                error={errors.emergencyContact}
+                ringClass={theme.ring}
+                required
+              />
+              
+              <Field
+                id="emergencyPhone"
+                label="Contact Phone"
+                type="tel"
+                value={emergencyPhone}
+                onChange={setEmergencyPhone}
+                icon={Phone}
+                placeholder="Emergency Contact Phone"
+                error={errors.emergencyPhone}
+                ringClass={theme.ring}
+                required
+              />
             </>
           )}
 
           {mode === "signin" && (
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between col-span-full">
               <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
                 <input
                   type="checkbox"
@@ -388,25 +603,27 @@ export function PortalAuth({
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className={cn(
-              "mt-2 flex h-11 items-center justify-center gap-2 rounded-lg text-sm font-semibold shadow-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60",
-              theme.buttonBg,
-              "text-white hover:shadow-lg hover:brightness-95 dark:hover:brightness-110",
-            )}
-          >
-            {loading && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-            {loading
-              ? "Please wait…"
-              : mode === "signin"
-                ? "Sign In"
-                : "Create Account"}
-          </button>
+          <div className="col-span-full mt-2">
+            <button
+              type="submit"
+              disabled={loading}
+              className={cn(
+                "flex h-11 w-full items-center justify-center gap-2 rounded-lg text-sm font-semibold shadow-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60",
+                theme.buttonBg,
+                "text-white hover:shadow-lg hover:brightness-95 dark:hover:brightness-110",
+              )}
+            >
+              {loading && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+              {loading
+                ? "Please wait…"
+                : mode === "signin"
+                  ? "Sign In"
+                  : "Create Account"}
+            </button>
+          </div>
 
           {mode === "signin" && theme.demoEmail && theme.demoPassword && (
-            <p className="text-center text-xs text-muted-foreground">
+            <p className="text-center text-xs text-muted-foreground col-span-full">
               Demo credentials: {theme.demoEmail} / {theme.demoPassword}
             </p>
           )}
